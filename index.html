@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Тридевятое: Сказитель — вертикальный срез</title>
 <link rel="stylesheet" href="style.css" />
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪶</text></svg>" />
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script>
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -20,10 +21,13 @@
     <div id="luck"></div>
   </div>
   <div id="tracker"></div>
+  <canvas id="minimap" width="170" height="170"></canvas>
+  <button id="btnGear" title="Настройки (P)">⚙</button>
+  <div id="touch" class="hidden"><div id="joy"><div id="joyKnob"></div></div><div id="tbtns"><button data-a="attack">⚔</button><button data-a="interact">✋</button><button data-a="sight">👁</button><button data-a="jump">⤴</button><button data-a="luck">🍀</button><button data-a="book">📖</button></div></div>
   <div id="prompt"></div>
   <div id="toasts"></div>
   <div id="help">WASD — идти · Shift — бежать · Пробел — прыжок · Мышь — камера (клик, чтобы захватить)<br>
-  ЛКМ/J — удар · ПКМ/K — блок · Q — Сказительский взгляд · R — Удача дурака · F — действие · B — Книга Сказов · H — скрыть подсказку</div>
+  ЛКМ/J — удар · ПКМ/K — блок · Q — Сказительский взгляд · R — Удача дурака · F — действие · B — Книга Сказов · T — щучье веление · P — настройки · H — скрыть подсказку</div>
 </div>
 
 <div id="dialog" class="hidden">
@@ -33,9 +37,27 @@
   <div id="dHint">Пробел — дальше</div>
 </div>
 
+<div id="timing" class="hidden">
+  <div id="tTitle"></div>
+  <div class="tBar"><div id="tZone"></div><div id="tPtr"></div></div>
+  <div class="muted small">Пробел / F / тап — тянуть!</div>
+</div>
+
+<div id="settings" class="hidden">
+  <div class="bookInner">
+    <h2>⚙ Настройки</h2>
+    <label>Громкость <input id="optVol" type="range" min="0" max="1" step="0.05" value="0.55"></label>
+    <label>Чувствительность мыши <input id="optSens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+    <label><input id="optHelp" type="checkbox" checked> Подсказка по управлению</label>
+    <p><button id="optClose">Вернуться в сказку</button> <button id="optReset">Начать заново</button></p>
+    <p class="muted small">Модели природы — Kenney Nature Kit (CC0). Сказки — народные, стихи — А. С. Пушкин.</p>
+  </div>
+</div>
+
 <div id="book" class="hidden">
   <div class="bookInner">
     <h2>📖 Книга Сказов</h2>
+    <p id="bookCount" class="muted"></p>
     <div id="bookList"></div>
     <h3>Забытые слова</h3>
     <div id="wordList"></div>
@@ -50,10 +72,10 @@
     <h2>Сказитель</h2>
     <p class="tag">Кощей крадёт не жизни, а память о сказках.<br>Свяжи порванные Нити Сказа — и мир оживёт.</p>
     <div class="btns">
-      <button id="btnNew">Новая сказка</button>
+      <button id="btnNew" disabled>Загрузка…</button>
       <button id="btnCont" class="hidden">Продолжить</button>
     </div>
-    <p class="muted">Вертикальный срез · Лукоморье · Иван · квест «Цепь златая» · ~15 минут</p>
+    <p class="muted">Лукоморье · 5 сказок · Иван-дурак · ~30 минут</p>
     <p class="muted small">WASD · мышь · Q — взгляд · F — действие · ЛКМ — удар</p>
   </div>
 </div>

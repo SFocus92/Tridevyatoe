@@ -57,10 +57,30 @@ export class UI {
       if (this._choices && n >= 1 && n <= this._choices.length && !this._typing) this._close(n - 1);
     }
   }
+  // мини-игра «тянем-потянем»: остановить бегунок в зелёной зоне
+  timing(title, speed = 1) {
+    return new Promise((res) => {
+      const box = this.$('timing'); box.classList.remove('hidden'); this.dialogOpen = true;
+      this.$('tTitle').textContent = title;
+      const zone = this.$('tZone'), ptr = this.$('tPtr');
+      const zw = 16 + Math.random() * 6, zx = 15 + Math.random() * (70 - zw); zone.style.left = zx + '%'; zone.style.width = zw + '%';
+      let x = 0, dir = 1, last = performance.now(), done = false;
+      const tick = (now) => { if (done) return; const dt = (now - last) / 1000; last = now; x += dir * dt * 95 * speed; if (x > 100) { x = 100; dir = -1; } if (x < 0) { x = 0; dir = 1; } ptr.style.left = x + '%'; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      const stop = (e) => {
+        if (e.type === 'keydown' && !['Space', 'KeyF', 'Enter'].includes(e.code)) return;
+        e.preventDefault(); done = true; removeEventListener('keydown', stop); box.removeEventListener('pointerdown', stop);
+        const ok = x >= zx && x <= zx + zw; ptr.classList.add(ok ? 'ok' : 'bad');
+        setTimeout(() => { ptr.classList.remove('ok', 'bad'); box.classList.add('hidden'); this.dialogOpen = false; res(ok); }, 550);
+      };
+      setTimeout(() => { addEventListener('keydown', stop); box.addEventListener('pointerdown', stop); }, 250);
+    });
+  }
   async say(speaker, lines) { for (const l of lines) await this.dialog(speaker, l); }
   book(st, open) {
     this.bookOpen = open; this.$('book').classList.toggle('hidden', !open);
     if (!open) return;
+    this.$('bookCount').textContent = `Сказы: ${st.book.length}/5 · Забытые слова: ${st.words.length}/5`;
     this.$('bookList').innerHTML = st.book.length
       ? st.book.map((b) => `<div class="entry"><h4>${b.title}</h4><div>${b.text}</div></div>`).join('')
       : '<p class="muted">Пока пусто. Свяжи первую Нить Сказа.</p>';

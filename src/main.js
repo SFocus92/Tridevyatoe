@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { Sound } from './audio.js';
 import { UI } from './ui.js';
+import { loadModels, place, instanced } from './assets.js';
 
 const S = new Sound();
 const ui = new UI();
@@ -28,6 +29,14 @@ sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, near: 1, far: 140 });
 sun.shadow.bias = -0.0008;
 scene.add(sun, sun.target);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  uniforms: { top: { value: new THREE.Color(0x3f8fe0) }, bottom: { value: new THREE.Color(0xd8efff) } },
+  vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vP; void main(){ float h = clamp(vP.y * 1.5 + 0.1, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(h, 0.8)), 1.0); \n#include <colorspace_fragment>\n }',
+});
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16), skyMat); skyDome.renderOrder = -1; scene.add(skyDome);
+const SKY = { topLive: new THREE.Color(0x3d8be0), botLive: new THREE.Color(0xcfeaff), topGray: new THREE.Color(0x7d858f), botGray: new THREE.Color(0xa9b0b6), topSight: new THREE.Color(0x2a1850), botSight: new THREE.Color(0x8a5aa0) };
 
 // ---------- материалы и «жизнь» мира ----------
 const grad = new THREE.DataTexture(new Uint8Array([85, 165, 255]), 3, 1, THREE.RedFormat);
@@ -42,7 +51,9 @@ const _g = new THREE.Color();
 function grayOf(c, out) { const l = c.r * 0.3 + c.g * 0.59 + c.b * 0.11; return out.setRGB(l * 0.8 + 0.05, l * 0.8 + 0.055, l * 0.8 + 0.065); }
 
 // ---------- рельеф ----------
-const SWAMP = new THREE.Vector2(27, -24), GROVE = new THREE.Vector2(-30, 14), PORTAL = new THREE.Vector2(-15, -36), FIRE = new THREE.Vector2(9, 9);
+const V2 = (x, y) => new THREE.Vector2(x, y);
+const SWAMP = V2(27, -24), GROVE = V2(-30, 14), PORTAL = V2(-15, -36), FIRE = V2(9, 9);
+const GARDEN = V2(-6, 30), STONE = V2(13, 18), PIKE = V2(35, 37), MOUSE = V2(-20, 32), KOLO_HOME = V2(24, 10);
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 function H(x, z) {
   const r = Math.hypot(x, z); const land = 1 - smooth(48, 62, r);
@@ -81,58 +92,52 @@ const seaGeo = new THREE.PlaneGeometry(600, 600, 120, 120); seaGeo.rotateX(-Math
 const sea = new THREE.Mesh(seaGeo, seaMat); sea.position.y = 0.05; scene.add(sea);
 const seaBaseY = Float32Array.from(seaGeo.attributes.position.array);
 
-// ---------- декор ----------
-const colliders = [];
-const trunkMat = toon(0x6b4423), leafA = toon(0x2f8f3a), leafB = toon(0x48a84f), birchMat = toon(0xf4f1e8), birchLeaf = toon(0x9ccc4a), pineMat = toon(0x1f6b3a), rockMat = toon(0x8a8a90);
+// ---------- декор (Kenney Nature Kit, CC0, перекрашен в лубочную палитру) ----------
+const MODEL_NAMES = ['tree_pineTallA', 'tree_pineTallB', 'tree_pineRoundC', 'tree_pineDefaultA', 'tree_detailed', 'tree_default', 'tree_oak', 'tree_fat', 'tree_plateau', 'tree_simple', 'flower_purpleA', 'flower_redA', 'flower_yellowA', 'flower_yellowB', 'flower_redB', 'mushroom_red', 'mushroom_redGroup', 'mushroom_tanGroup', 'plant_bush', 'plant_bushLarge', 'plant_bushDetailed', 'grass_large', 'grass_leafs', 'rock_largeA', 'rock_largeC', 'rock_smallA', 'rock_tallB', 'stone_tallA', 'stone_largeB', 'stump_old', 'stump_round', 'log', 'log_large', 'log_stack', 'lily_large', 'lily_small', 'crop_turnip', 'campfire_stones', 'canoe', 'sign', 'crops_dirtRow', 'crops_wheatStageB', 'crops_leafsStageB'];
+const btnNew = document.getElementById('btnNew');
+const { models: MD } = await loadModels(MODEL_NAMES, toon, (k) => (btnNew.textContent = `Загрузка… ${Math.round(k * 100)}%`));
+btnNew.textContent = 'Новая сказка'; btnNew.disabled = false;
+const P = (n, x, z, s = 1, ry = srand() * 6.28, dy = 0) => place(MD, scene, n, x, H(x, z) + dy, z, s, ry);
+const colliders = []; const camBlockers = [];
+const trunkMat = toon(0x6b4423), leafA = toon(0x2f8f3a), leafB = toon(0x48a84f), birchMat = toon(0xf4f1e8), birchLeaf = toon(0x9ccc4a), birchSpot = toon(0x2a2a2a);
 function birch(x, z) {
-  const y = H(x, z); const hgt = rand(4, 6);
-  M(new THREE.CylinderGeometry(0.18, 0.25, hgt, 6), birchMat, x, y + hgt / 2, z);
-  for (let k = 0; k < 3; k++) M(new THREE.IcosahedronGeometry(rand(1.1, 1.6), 0), birchLeaf, x + rand(-0.6, 0.6), y + hgt - 0.3 + k * 0.7, z + rand(-0.6, 0.6));
-  colliders.push({ x, z, r: 0.5 });
+  const y = H(x, z); const hgt = 4.5 + srand() * 2; const g = new THREE.Group(); g.position.set(x, y, z); scene.add(g);
+  M(new THREE.CylinderGeometry(0.17, 0.24, hgt, 7), birchMat, 0, hgt / 2, 0, g);
+  for (let k = 0; k < 6; k++) { const a = k * 1.9; const sp = M(new THREE.BoxGeometry(0.16, 0.05, 0.04), birchSpot, Math.sin(a) * 0.2, 0.6 + (k * hgt) / 7, Math.cos(a) * 0.2, g); sp.rotation.y = a; }
+  for (let k = 0; k < 3; k++) M(new THREE.IcosahedronGeometry(1.1 + srand() * 0.5, 0), birchLeaf, srand() - 0.5, hgt - 0.3 + k * 0.7, srand() - 0.5, g);
+  colliders.push({ x, z, r: 0.5 }); camBlockers.push(g);
 }
-function pine(x, z) {
-  const y = H(x, z);
-  M(new THREE.CylinderGeometry(0.2, 0.3, 1.6, 6), trunkMat, x, y + 0.8, z);
-  for (let k = 0; k < 3; k++) M(new THREE.ConeGeometry(1.8 - k * 0.45, 2.2, 7), pineMat, x, y + 2 + k * 1.2, z);
-  colliders.push({ x, z, r: 0.6 });
+const PINES = ['tree_pineTallA', 'tree_pineTallB', 'tree_pineRoundC', 'tree_pineDefaultA'], LEAFY = ['tree_detailed', 'tree_default', 'tree_oak', 'tree_fat', 'tree_plateau', 'tree_simple'];
+function tree(x, z) {
+  const pine = srand() < 0.5; const n = pine ? PINES[Math.floor(srand() * 4)] : LEAFY[Math.floor(srand() * 6)];
+  const o = P(n, x, z, pine ? 4 + srand() * 2.5 : 4.5 + srand() * 2.5); colliders.push({ x, z, r: 0.6 }); camBlockers.push(o);
 }
-function rock(x, z, s) { const r = M(new THREE.DodecahedronGeometry(s, 0), rockMat, x, H(x, z) + s * 0.3, z); r.rotation.set(rand(0, 3), rand(0, 3), 0); colliders.push({ x, z, r: s * 0.9 }); }
-const far = (x, z, p, d) => Math.hypot(x - p.x, z - p.y) > d;
-for (let i = 0; i < 70; i++) {
-  const a = srand() * Math.PI * 2, r = 12 + srand() * 32, x = Math.cos(a) * r, z = Math.sin(a) * r;
-  if (!far(x, z, SWAMP, 12) || !far(x, z, GROVE, 10) || !far(x, z, PORTAL, 7) || !far(x, z, FIRE, 6) || Math.hypot(x - 10, z - 13) < 5) continue;
-  if (srand() < 0.5) birch(x, z); else pine(x, z);
-}
+const ZONES = [[SWAMP, 12], [GROVE, 10], [PORTAL, 7], [FIRE, 6], [GARDEN, 10], [STONE, 5], [PIKE, 7], [V2(10, 13), 5], [MOUSE, 3], [V2(0, 0), 9]];
+const free = (x, z, extra = 0) => ZONES.every(([p, d]) => Math.hypot(x - p.x, z - p.y) > d + extra);
+for (let i = 0; i < 95; i++) { const a = srand() * 6.28, r = 12 + srand() * 33, x = Math.cos(a) * r, z = Math.sin(a) * r; if (!free(x, z)) continue; if (srand() < 0.3) birch(x, z); else tree(x, z); }
 for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; birch(GROVE.x + Math.cos(a) * 9, GROVE.y + Math.sin(a) * 9); }
-for (let i = 0; i < 18; i++) { const a = srand() * 6.28, r = 15 + srand() * 38; rock(Math.cos(a) * r, Math.sin(a) * r, 0.4 + srand() * 0.9); }
-
-// трава
-const grassMat = toon(0x5fb24a);
-const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.12, 0.6, 3), grassMat, 1800);
-const flowerGeo = new THREE.IcosahedronGeometry(0.16, 0);
-const flowers = new THREE.InstancedMesh(flowerGeo, new THREE.MeshToonMaterial({ gradientMap: grad }), 420);
-const flowerPos = [];
-{
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
-  let gi = 0;
-  while (gi < 1800) {
-    const x = (srand() - 0.5) * 100, z = (srand() - 0.5) * 100, h = H(x, z);
-    if (h < 1.1 || Math.hypot(x, z) > 47) continue;
-    p.set(x, h + 0.25, z); s.setScalar(0.7 + srand() * 0.8); m.compose(p, q, s); grass.setMatrixAt(gi++, m);
-  }
-  const fc = [0xff4d6d, 0xffd23f, 0x4d9dff, 0xffffff, 0xff8c42, 0xc77dff].map((h) => new THREE.Color(h));
-  let fi = 0;
-  while (fi < 420) {
-    const x = (srand() - 0.5) * 96, z = (srand() - 0.5) * 96, h = H(x, z);
-    if (h < 1.1 || Math.hypot(x, z) > 46) continue;
-    flowerPos.push(new THREE.Vector3(x, h + 0.3, z)); flowers.setColorAt(fi, fc[fi % fc.length]); fi++;
-  }
-}
-grass.receiveShadow = true; scene.add(grass, flowers);
-function setFlowers(k) {
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3();
-  flowerPos.forEach((p, i) => { s.setScalar(Math.max(0.001, k)); m.compose(p, q, s); flowers.setMatrixAt(i, m); });
-  flowers.instanceMatrix.needsUpdate = true;
+const ROCKS = ['rock_largeA', 'rock_largeC', 'rock_tallB', 'stone_largeB'];
+for (let i = 0; i < 24; i++) { const a = srand() * 6.28, r = 14 + srand() * 36, x = Math.cos(a) * r, z = Math.sin(a) * r; if (!free(x, z, -2)) continue; const sc = 2 + srand() * 2.5; const o = P(ROCKS[i % 4], x, z, sc, srand() * 6.28, -0.2); colliders.push({ x, z, r: sc * 0.3 }); camBlockers.push(o); }
+for (let i = 0; i < 70; i++) { const a = srand() * 6.28, r = 8 + srand() * 38, x = Math.cos(a) * r, z = Math.sin(a) * r; if (!free(x, z, -3) || H(x, z) < 1) continue; P(['plant_bush', 'plant_bushLarge', 'plant_bushDetailed'][i % 3], x, z, 2.2 + srand() * 1.5); }
+for (let i = 0; i < 34; i++) { const a = srand() * 6.28, r = 2 + srand() * 11; const c = i < 18 ? GROVE : SWAMP; const x = c.x + Math.cos(a) * r, z = c.y + Math.sin(a) * r; if (H(x, z) < 0.35) continue; P(['mushroom_red', 'mushroom_redGroup', 'mushroom_tanGroup'][i % 3], x, z, 2 + srand() * 1.5); }
+[[-12, -14, 'stump_round'], [31, 2, 'stump_old'], [-38, -6, 'log_large'], [16, -30, 'log'], [6, 34, 'stump_round'], [-26, -16, 'log_stack']].forEach(([x, z, n]) => { P(n, x, z, 3); colliders.push({ x, z, r: 0.9 }); });
+P('stump_old', MOUSE.x + 0.9, MOUSE.y, 3.2, 0.5); colliders.push({ x: MOUSE.x + 0.9, z: MOUSE.y, r: 0.6 });
+// трава и цветы — инстансами
+const grassT = [];
+while (grassT.length < 1500) { const x = (srand() - 0.5) * 100, z = (srand() - 0.5) * 100, h = H(x, z); if (h < 1.1 || Math.hypot(x, z) > 47) continue; grassT.push({ p: new THREE.Vector3(x, h - 0.05, z), s: 2 + srand() * 1.6, ry: srand() * 6.28 }); }
+instanced(MD.grass_leafs, grassT.slice(0, 900), scene); instanced(MD.grass_large, grassT.slice(900), scene);
+const flowerSets = ['flower_purpleA', 'flower_redA', 'flower_yellowA', 'flower_yellowB', 'flower_redB'].map((n) => {
+  const t = []; while (t.length < 75) { const x = (srand() - 0.5) * 96, z = (srand() - 0.5) * 96, h = H(x, z); if (h < 1.1 || Math.hypot(x, z) > 46) continue; t.push({ p: new THREE.Vector3(x, h - 0.05, z), s: 2.6 + srand() * 1.2, ry: srand() * 6.28 }); }
+  return instanced(MD[n], t, scene);
+});
+let flowersK = -1;
+function setFlowers(k) { k = Math.round(k * 50) / 50; if (k === flowersK) return; flowersK = k; flowerSets.forEach((f) => f.set(Math.max(0.0001, k))); }
+// облака
+const cloudMat = toon(0xffffff, {}, true); const clouds = [];
+for (let i = 0; i < 14; i++) {
+  const g = new THREE.Group(); const n = 4 + Math.floor(srand() * 4);
+  for (let k = 0; k < n; k++) { const c = new THREE.Mesh(new THREE.IcosahedronGeometry(2.5 + srand() * 3, 0), cloudMat); c.position.set(k * 3 - n * 1.5, srand() * 1.5, srand() * 3 - 1.5); c.scale.y = 0.6; g.add(c); }
+  const a = srand() * 6.28, r = 30 + srand() * 90; g.position.set(Math.cos(a) * r, 45 + srand() * 25, Math.sin(a) * r); g.userData.sp = 0.5 + srand(); scene.add(g); clouds.push(g);
 }
 
 // ---------- дуб и златая цепь ----------
@@ -142,7 +147,7 @@ M(new THREE.CylinderGeometry(1.1, 1.7, 8, 10), trunkMat, 0, 4, 0, oak);
 const branch = M(new THREE.CylinderGeometry(0.3, 0.5, 5, 7), trunkMat, 2.4, 6.4, 0, oak); branch.rotation.z = -1.15;
 const branch2 = M(new THREE.CylinderGeometry(0.3, 0.45, 4.5, 7), trunkMat, -2, 7, 1, oak); branch2.rotation.set(0.4, 0, 1.1);
 [[0, 10, 0, 4.2, leafA], [3, 9, 1.5, 3, leafB], [-3, 9.4, -1, 3.2, leafB], [1, 11.8, -2, 2.8, leafA], [-1.5, 10.5, 2.8, 2.6, leafA], [4.5, 8, -1.5, 2.2, leafA]].forEach(([x, y, z, r, mat]) => M(new THREE.IcosahedronGeometry(r, 1), mat, x, y, z, oak));
-colliders.push({ x: 0, z: 0, r: 1.9 });
+colliders.push({ x: 0, z: 0, r: 1.9 }); camBlockers.push(oak);
 const goldMat = toon(0xffc93a, { emissive: 0x332200 });
 const chainLinks = []; const GAPS = [7, 15, 23];
 for (let i = 0; i < 30; i++) {
@@ -156,6 +161,7 @@ const gapWorld = (k) => chainLinks[GAPS[k]].getWorldPosition(new THREE.Vector3()
 // ---------- костёр ----------
 const FIRE3 = new THREE.Vector3(FIRE.x, H(FIRE.x, FIRE.y), FIRE.y);
 for (let k = 0; k < 4; k++) { const lg = M(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 5), trunkMat, FIRE3.x, FIRE3.y + 0.15, FIRE3.z); lg.rotation.set(Math.PI / 2, (k * Math.PI) / 4, 0); }
+P('campfire_stones', FIRE.x, FIRE.y, 3.2, 0);
 const flameMat = new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: 0.9 });
 const flame2Mat = new THREE.MeshBasicMaterial({ color: 0xffe066, transparent: true, opacity: 0.9 });
 const flame = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.3, 7), flameMat); flame.position.set(FIRE3.x, FIRE3.y + 0.8, FIRE3.z);
@@ -182,6 +188,7 @@ const bogMat = toon(0x3d5a3a, { transparent: true, opacity: 0.85 });
 const bog = new THREE.Mesh(new THREE.CircleGeometry(9, 28), bogMat); bog.rotation.x = -Math.PI / 2; bog.position.set(SWAMP.x, 0.3, SWAMP.y); scene.add(bog);
 const reedMat = toon(0x7a8a3a);
 for (let i = 0; i < 40; i++) { const a = srand() * 6.28, r = 6 + srand() * 5; const x = SWAMP.x + Math.cos(a) * r, z = SWAMP.y + Math.sin(a) * r; M(new THREE.CylinderGeometry(0.04, 0.05, 1.6, 4), reedMat, x, Math.max(H(x, z), 0.3) + 0.8, z); }
+for (let i = 0; i < 16; i++) { const a = srand() * 6.28, r = 1 + srand() * 7; place(MD, scene, i % 2 ? 'lily_large' : 'lily_small', SWAMP.x + Math.cos(a) * r, 0.32, SWAMP.y + Math.sin(a) * r, 2.5, srand() * 6.28); }
 const KIKI_POS = new THREE.Vector3(SWAMP.x - 4, Math.max(H(SWAMP.x - 4, SWAMP.y + 3), 0.3), SWAMP.y + 3);
 
 // ---------- персонажи ----------
@@ -300,13 +307,13 @@ ring.rotation.x = -Math.PI / 2; ring.position.set(0, OAK.y + 0.5, 0); scene.add(
 let ringT = -1;
 
 // ---------- состояние ----------
-const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false });
+const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false, turnip: 0, pike: 0, kolobok: 0, feathers: [false, false, false, false, false, false, false], stoneReads: 0 });
 let st = freshState();
 const save = () => localStorage.setItem(SAVE_KEY, JSON.stringify(st));
 const linkCount = () => Object.values(st.links).filter(Boolean).length;
 
 const player = { pos: new THREE.Vector3(10, 0, 13), vy: 0, facing: Math.PI, onGround: true, hp: 5, maxHp: 5, word: 100, attackT: 0, hurtT: 0, buffT: 0, speedT: 0, luckCd: 0, walk: 0, sight: false, locked: false };
-let camYaw = 0.6, camPitch = 0.3, camDist = 8;
+let camYaw = 0.6, camPitch = 0.3, camDist = 8, sens = 1;
 
 // враги
 const enemies = [];
@@ -340,6 +347,8 @@ addEventListener('keydown', (e) => {
   if (!started) return;
   keys.add(e.code);
   if (ui.dialogOpen) return;
+  if (e.code === 'KeyP' || (e.code === 'Escape' && !settingsEl.classList.contains('hidden'))) { toggleSettings(settingsEl.classList.contains('hidden')); return; }
+  if (!settingsEl.classList.contains('hidden')) return;
   if (e.code === 'KeyB') { ui.book(st, !ui.bookOpen); if (ui.bookOpen) document.exitPointerLock(); return; }
   if (ui.bookOpen) return;
   if (player.locked) return;
@@ -348,6 +357,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyJ') attack();
   if (e.code === 'KeyR') luck();
   if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hidden');
+  if (e.code === 'KeyT') teleport();
   if (e.code === 'Space') e.preventDefault();
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
@@ -360,7 +370,7 @@ canvas.addEventListener('mousedown', (e) => {
 addEventListener('mouseup', (e) => { if (e.button === 2) mouseBlock = false; });
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas) return;
-  camYaw -= e.movementX * 0.0028; camPitch = Math.min(1.25, Math.max(0.05, camPitch + e.movementY * 0.0022));
+  camYaw -= e.movementX * 0.0028 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + e.movementY * 0.0022 * sens));
 });
 addEventListener('wheel', (e) => { camDist = Math.min(16, Math.max(4, camDist + e.deltaY * 0.01)); });
 
@@ -432,6 +442,12 @@ const interactables = [
   { label: 'Скрепить златую цепь', pos: () => OAK, r: 4.8, prio: 5, cond: () => st.stage === 2, act: () => restore() },
   { label: 'Посидеть у костра', pos: () => FIRE3, r: 3, act: () => fireTalk() },
   { label: 'Коснуться портала', pos: () => PORTAL3, r: 4, act: () => portalTalk() },
+  { label: 'Прочитать надпись на камне', pos: () => STONE3, r: 3.2, act: () => stoneTalk() },
+  { label: 'Поговорить с Дедом', pos: () => ded.position, r: 3.2, act: () => dedTalk() },
+  { label: 'Тянуть репку!', pos: () => TURNIP3, r: 3.2, prio: 2, cond: () => st.turnip === 2, act: () => pullTurnip() },
+  { label: 'Позвать мышку-норушку', pos: () => MOUSE3, r: 2.8, cond: () => st.turnip < 2 && player.sight, act: () => mouseTalk() },
+  { label: 'Помочь щуке', pos: () => PIKE3, r: 3.2, cond: () => !st.pike, act: () => pikeTalk() },
+  { label: 'Спросить Колобка, куда идти', pos: () => kolobok.position, r: 2.4, cond: () => st.kolobok === 1, act: () => koloTalk() },
 ];
 function nearest() {
   let best = null, bd = 1e9;
@@ -487,7 +503,8 @@ async function catTalk() {
     } else await ui.say(CAT, ['Мур-р… Ну, раз ты так говоришь. (Кот хитро щурится. Кажется, он что-то перепутал.)']);
     return;
   }
-  await ui.say(CAT, ['Портал в Дремучий лес проснулся. Там Баба-Яга забыла, кто она. Но это — уже другая сказка.']);
+  if (st.book.length >= 5) { await ui.say(CAT, ['Пять сказов в твоей Книге, Сказитель! Лукоморье помнит себя целиком.', 'Скажу тебе тайну: Кощей тоже когда-то был сказителем. Его забыли — и он решил забыть всех. Найди все забытые слова — и узнаешь его настоящее имя.', 'А теперь — в Дремучий лес. Баба-Яга ждёт… хоть сама и не помнит, что ждёт.']); return; }
+  await ui.say(CAT, ['Портал в Дремучий лес проснулся. Но не спеши: в Лукоморье ещё остались забытые сказки. Дед с репкой, щука на берегу, Колобок… Собери все пять сказов.']);
 }
 async function mermaidTalk() {
   if (st.stage === 0) { await ui.say(MER, ['Ля-ля… кто ты? Я забыла… Спроси сначала кота.']); return; }
@@ -560,26 +577,332 @@ async function restore() {
   await ui.say(CAT, ['Мяу!.. МЯУ! Я помню! Я всё помню! Направо — песнь, налево — сказка!', 'Смотри, Сказитель: море синее, трава зелёная… Это ты сделал. Ты рассказал сказку заново.', 'Подойди, когда отдышишься. Прочту тебе кое-что.']);
 }
 
+// ---------- контур (cel-look) ----------
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1a120a, side: THREE.BackSide });
+function outline(root, k = 1.07) {
+  const list = []; root.traverse((o) => { if (o.isMesh && !o.userData.isOutline) list.push(o); });
+  list.forEach((o) => { o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere.radius < 0.08) return; const m = new THREE.Mesh(o.geometry, outlineMat); m.userData.isOutline = true; m.scale.setScalar(k); o.add(m); });
+}
+[ivan, cat, mermaid, kiki].forEach((g) => outline(g));
+
+// ---------- новые сказки: персонажи ----------
+function makeOldMan() {
+  const g = new THREE.Group();
+  const skin = toon(0xf0c6a0), shirt = toon(0xeae2cf), pants = toon(0x6b6b78), beard = toon(0xf7f7f2), belt = toon(0xc0392b), lapti = toon(0xc9a35a);
+  M(new THREE.BoxGeometry(0.22, 0.75, 0.22), pants, -0.14, 0.4, 0, g); M(new THREE.BoxGeometry(0.22, 0.75, 0.22), pants, 0.14, 0.4, 0, g);
+  M(new THREE.BoxGeometry(0.26, 0.14, 0.34), lapti, -0.14, 0.07, 0.04, g); M(new THREE.BoxGeometry(0.26, 0.14, 0.34), lapti, 0.14, 0.07, 0.04, g);
+  M(new THREE.CylinderGeometry(0.3, 0.42, 0.95, 10), shirt, 0, 1.25, 0, g);
+  M(new THREE.CylinderGeometry(0.43, 0.43, 0.08, 10), belt, 0, 0.86, 0, g);
+  M(new THREE.SphereGeometry(0.27, 12, 10), skin, 0, 1.92, 0, g);
+  const b = M(new THREE.ConeGeometry(0.22, 0.6, 8), beard, 0, 1.6, 0.16, g); b.rotation.x = Math.PI;
+  M(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), beard, 0, 1.97, -0.02, g);
+  [-0.45, 0.45].forEach((x) => M(new THREE.BoxGeometry(0.16, 0.6, 0.16), shirt, x, 1.3, 0.05, g));
+  const e = toon(0x222222, {}, true); M(new THREE.SphereGeometry(0.04, 6, 6), e, -0.09, 1.97, 0.24, g); M(new THREE.SphereGeometry(0.04, 6, 6), e, 0.09, 1.97, 0.24, g);
+  return g;
+}
+function makeMouse() {
+  const g = new THREE.Group(); const fur = toon(0x9a9aa2), pink = toon(0xffa8b8), e = toon(0x111111, {}, true);
+  M(new THREE.SphereGeometry(0.22, 10, 8), fur, 0, 0.2, 0, g).scale.set(0.9, 0.85, 1.3);
+  M(new THREE.SphereGeometry(0.14, 10, 8), fur, 0, 0.3, 0.27, g);
+  [-0.1, 0.1].forEach((x) => { M(new THREE.SphereGeometry(0.08, 8, 6), pink, x, 0.45, 0.22, g).scale.z = 0.4; M(new THREE.SphereGeometry(0.025, 6, 6), e, x * 0.6, 0.34, 0.39, g); });
+  const t = M(new THREE.TorusGeometry(0.2, 0.02, 4, 10, Math.PI), pink, 0, 0.2, -0.38, g); t.rotation.y = Math.PI / 2;
+  return g;
+}
+function makeKolobok() {
+  const g = new THREE.Group(); const body = new THREE.Group(); g.add(body);
+  const dough = toon(0xf2b84b), e = toon(0x2a1a0a, {}, true), cheek = toon(0xff8a7a), mouth = toon(0x8a2a1a, {}, true);
+  M(new THREE.SphereGeometry(0.5, 16, 12), dough, 0, 0, 0, body);
+  [-0.16, 0.16].forEach((x) => { M(new THREE.SphereGeometry(0.06, 8, 6), e, x, 0.12, 0.45, body); M(new THREE.SphereGeometry(0.08, 8, 6), cheek, x * 1.7, -0.02, 0.4, body).scale.z = 0.4; });
+  const sm = M(new THREE.TorusGeometry(0.15, 0.03, 6, 12, Math.PI), mouth, 0, -0.05, 0.46, body); sm.rotation.z = Math.PI;
+  g.userData.body = body; return g;
+}
+function makePike() {
+  const g = new THREE.Group(); const scale = toon(0x6f8f5a), belly = toon(0xd8dcc0), fin = toon(0xc0603a), teeth = toon(0xffffff, {}, true), e = toon(0xffd23f);
+  M(new THREE.SphereGeometry(0.4, 14, 10), scale, 0, 0.3, 0, g).scale.set(0.7, 0.6, 2.2);
+  M(new THREE.SphereGeometry(0.35, 12, 8), belly, 0, 0.22, 0.05, g).scale.set(0.6, 0.4, 2);
+  const tail = M(new THREE.ConeGeometry(0.3, 0.5, 4), fin, 0, 0.3, -1.05, g); tail.rotation.x = -Math.PI / 2; tail.scale.x = 0.25;
+  M(new THREE.ConeGeometry(0.12, 0.35, 4), fin, 0, 0.6, -0.2, g).scale.z = 0.3;
+  for (let i = 0; i < 4; i++) M(new THREE.ConeGeometry(0.025, 0.08, 4), teeth, -0.06 + i * 0.04, 0.24, 0.85, g).rotation.x = Math.PI;
+  [-0.14, 0.14].forEach((x) => M(new THREE.SphereGeometry(0.05, 6, 6), e, x, 0.42, 0.62, g));
+  g.userData.tail = tail; return g;
+}
+function makeFeather() {
+  const g = new THREE.Group();
+  const f = new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.0, 6), new THREE.MeshBasicMaterial({ color: 0xff7a1a })); f.scale.z = 0.25; f.position.y = 0.5; g.add(f);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffe14a })); tip.position.y = 0.15; g.add(tip);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false })); glow.position.y = 0.5; g.add(glow);
+  g.rotation.z = 0.5; return g;
+}
+
+const STONE3 = new THREE.Vector3(STONE.x, H(STONE.x, STONE.y), STONE.y);
+const stone = P('stone_tallA', STONE.x, STONE.y, 4.5, 0.4); colliders.push({ x: STONE.x, z: STONE.y, r: 1 }); camBlockers.push(stone);
+
+// огород деда
+const GARDEN3 = new THREE.Vector3(GARDEN.x, H(GARDEN.x, GARDEN.y), GARDEN.y);
+for (let r = -1; r <= 1; r++) for (let c = -2; c <= 2; c++) { if (r === 0 && c === 0) continue; P('crops_dirtRow', GARDEN.x + c * 1.6, GARDEN.y + r * 2.4, 2.6, 0); P(r === 1 ? 'crops_wheatStageB' : 'crops_leafsStageB', GARDEN.x + c * 1.6, GARDEN.y + r * 2.4, 2.6, 0, 0.1); }
+const TURNIP3 = GARDEN3.clone();
+const turnip = P('crop_turnip', GARDEN.x, GARDEN.y, 6, 0, -1.6);
+colliders.push({ x: GARDEN.x, z: GARDEN.y, r: 1.2 });
+const ded = makeOldMan(); ded.position.set(GARDEN.x + 2.6, H(GARDEN.x + 2.6, GARDEN.y - 1.5), GARDEN.y - 1.5); ded.lookAt(0, ded.position.y, 0); scene.add(ded); outline(ded);
+colliders.push({ x: ded.position.x, z: ded.position.z, r: 0.5 });
+P('sign', GARDEN.x - 5, GARDEN.y - 4, 3, 0.6);
+const mouse = makeMouse(); const MOUSE3 = new THREE.Vector3(MOUSE.x, H(MOUSE.x, MOUSE.y), MOUSE.y); mouse.position.copy(MOUSE3); scene.add(mouse);
+
+// щука на берегу
+const PIKE3 = new THREE.Vector3(PIKE.x, Math.max(H(PIKE.x, PIKE.y), 0.1), PIKE.y);
+const pike = makePike(); pike.position.copy(PIKE3); pike.rotation.y = 0.9; scene.add(pike); outline(pike);
+P('canoe', PIKE.x - 4, PIKE.y + 1, 3.5, 2.2, 0.05);
+
+// колобок
+const kolobok = makeKolobok(); kolobok.position.set(KOLO_HOME.x + 8, 0, KOLO_HOME.y); scene.add(kolobok); outline(kolobok, 1.05);
+const kolo = { a: 0, cd: 0, sang: 0, vel: new THREE.Vector3() };
+
+// перья Жар-птицы (3 из 7 видно только Сказительским взглядом)
+const FEATHERS = [[-40, -10, 0], [38, -6, 1], [4, -42, 0], [-24, -26, 1], [18, 30, 0], [-43, 22, 1], [1, 21, 0]].map(([x, z, hidden], i) => {
+  const g = makeFeather(); g.position.set(x, H(x, z) + 1, z); scene.add(g); return { g, hidden: !!hidden, i };
+});
+
+// ---------- новые сказки: диалоги ----------
+const DED = 'Дед', MOUSEN = 'Мышка-норушка', PIKEN = 'Щука', KOLO = 'Колобок';
+function addBook(title, text) {
+  if (st.book.some((b) => b.title === title)) return;
+  st.book.push({ title, text }); save(); ui.toast(`📖 Новый сказ в Книге: «${title}» (${st.book.length}/5)`, false, 3500);
+  if (st.book.length === 5) setTimeout(() => ui.toast('Все сказы Лукоморья собраны! Кот учёный хочет тебе кое-что сказать.', true, 4500), 2500);
+}
+function addWord(word, text) { if (st.words.some((w) => w.word === word)) return; st.words.push({ word, text }); save(); S.chime(); ui.toast(`Найдено забытое слово ${st.words.length}/5: «${word}»`, true); }
+async function stoneTalk() {
+  st.stoneReads++; save();
+  if (st.stoneReads < 3) {
+    await ui.say('Камень на распутье', ['Направо пойдёшь — к болоту придёшь, Кикиморе смех принесёшь.\nНалево пойдёшь — в берёзовой роще забудок найдёшь.\nПрямо пойдёшь — к дубу выйдешь, где кот учёный сказку забыл.', st.stoneReads === 1 ? 'Ниже кто-то нацарапал: «Ваня, не забудь поесть. — Мама».' : 'Буквы будто дрожат… Может, прочесть ещё раз?']);
+    return;
+  }
+  await ui.say('Камень на распутье', ['Ты читаешь в третий раз — и проступают новые буквы. Закон трёх!', '«РАСПУТЬЕ — место, где дорога делится натрое. Выбирая путь, сказочный герой выбирает себя».']);
+  addWord('Распутье', 'место, где дорога делится. Выбирая путь, герой выбирает, каким ему быть.');
+}
+async function dedTalk() {
+  if (st.turnip === 0) {
+    await ui.say(DED, ['Посадил дед репку. Выросла репка большая-пребольшая… А вытянуть некому!', 'Бабка, внучка, Жучка да кошка — все забыли, кто они, разбрелись по серости. Один я остался.']);
+    const c = await ui.dialog(DED, 'Подсоби, молодец! Тянем-потянем?', ['Давай, дедушка!', 'Попозже, дед.']);
+    if (c !== 0) return;
+    st.turnip = 1; save();
+    await ui.timing('Тянем-потянем!', 1.1);
+    S.wrong();
+    await ui.say(DED, ['Тянут-потянут — вытянуть не могут!', 'Эх… Не хватает самой малости. Позвать бы кого — хоть самого маленького.', 'У старого пня, к западу, мышка-норушка живёт. Да простым глазом её не увидишь — она от серости спряталась.']);
+    return;
+  }
+  if (st.turnip === 1) { await ui.say(DED, ['Мышку найди, внучек. У старого пня, к западу от огорода. Смотри Сказительским взглядом.']); return; }
+  if (st.turnip === 2) { await ui.say(DED, ['Мышка с нами! Ну, теперь берись за репку — тянем!']); return; }
+  await ui.say(DED, ['Спасибо, внучек! Бабка с внучкой вернутся — кашу сварим. А ты помни: и самый маленький может всё решить.']);
+}
+async function mouseTalk() {
+  if (st.turnip === 0) { await ui.say(MOUSEN, ['Пи! Ты меня видишь? Я мышка-норушка. Боюсь серости… Если кому помощь нужна — зови.']); return; }
+  await ui.say(MOUSEN, ['Пи! Репку тянуть? Я? Я же самая маленькая!', 'Ну… раз без меня никак — побежали!']);
+  st.turnip = 2; save(); S.chime(); burst(MOUSE3.clone().setY(MOUSE3.y + 0.5), 0xffffff, 20, 2, 0.8, 0.15);
+  ui.toast('Мышка-норушка побежала к огороду деда');
+}
+async function pullTurnip() {
+  await ui.say(DED, ['Дедка за репку, Иван за дедку, мышка за Ивана… Три раза дружно — и вытянем! Лови момент!']);
+  let ok = 0;
+  while (ok < 3) {
+    const hit = await ui.timing(`Тянем-потянем! (${ok}/3)`, 1 + ok * 0.25);
+    if (hit) { ok++; S.pluck(220 * (1 + ok * 0.25), 0, 0.2, 0.6); turnip.position.y += 0.4; ivan.userData.armR.rotation.x = -1.4; }
+    else { S.wrong(); const c = await ui.dialog(DED, 'Ух! Не в лад потянули. Ещё разок?', ['Тянем!', 'Передохнём']); if (c === 1) { turnip.position.y = H(GARDEN.x, GARDEN.y) - 1.6; return; } }
+  }
+  const t0 = performance.now(), y0 = turnip.position.y;
+  await new Promise((res) => { const step = () => { const t = Math.min(1, (performance.now() - t0) / 900); turnip.position.y = y0 + Math.sin(t * Math.PI) * 3 + t * 0.6; turnip.position.x = GARDEN.x + t * 2.5; turnip.rotation.z = -t * 1.4; t < 1 ? requestAnimationFrame(step) : res(); }; step(); });
+  burst(turnip.position.clone(), 0xffe27a, 80, 6, 1.5, 0.3); S.restore();
+  st.turnip = 3; player.maxHp = 6; player.hp = 6; save();
+  ui.toast('Вытянули репку! +1 ❤ — сила репки', true);
+  await ui.say(DED, ['Вытянули! Ай да мы! А мышка-то — главная оказалась.', 'Держи, внучек: репка богатырская. Кто её поест — тому сил прибавится.']);
+  addBook('Репка', 'Посадил дед репку, а вытянуть её было некому — все забыли, кто они. Иван взялся помогать, но и вдвоём не смогли. Только когда прибежала крошечная мышка-норушка, репка поддалась. Самый маленький оказался самым нужным.');
+}
+async function pikeTalk() {
+  await ui.say(PIKEN, ['Ой-ой… Иван! Волной меня на берег выбросило, а серость будто воду высушила…']);
+  for (;;) {
+    const c = await ui.dialog(PIKEN, 'Отпусти меня в море — я тебе пригожусь!', ['Плыви, щука!', 'А желания исполняешь?', 'Сварю-ка я уху…']);
+    if (c === 1) { await ui.say(PIKEN, ['Исполняю! Но только добрым. Отпусти — и проверим, добрый ли ты.']); continue; }
+    if (c === 2) { await ui.say(PIKEN, ['Ох, не губи, Иванушка! Да ты и не такой — по глазам вижу, сердце у тебя доброе.']); continue; }
+    break;
+  }
+  const from = pike.position.clone(); const out = new THREE.Vector3(PIKE.x, 0, PIKE.y).normalize().multiplyScalar(9).add(from); out.y = -0.5;
+  const t0 = performance.now();
+  await new Promise((res) => { const step = () => { const t = Math.min(1, (performance.now() - t0) / 1100); pike.position.lerpVectors(from, out, t); pike.position.y += Math.sin(t * Math.PI) * 3; pike.rotation.x = t * 2; t < 1 ? requestAnimationFrame(step) : res(); }; step(); });
+  pike.visible = false; burst(out.clone().setY(0.3), 0xbfe8ff, 50, 5, 1.2, 0.25); S.noise(0, 0.5, 1200, 0.3);
+  st.pike = 1; save();
+  await ui.say(PIKEN, ['(из воды) Спасибо, Иван! Слушай и запоминай: «По щучьему велению, по моему хотению».', 'Скажи эти слова — нажми T — и окажешься там, где пожелаешь. Только для добрых дел!']);
+  ui.toast('Новое умение: T — «По щучьему велению»', true);
+  addBook('По щучьему велению', 'На берегу Лукоморья Иван нашёл щуку, выброшенную волной. Мог сварить уху, а отпустил в море. В благодарность щука научила его волшебным словам: «По щучьему велению, по моему хотению» — и теперь Иван может в мгновение ока оказаться где пожелает.');
+}
+const TP = [['Дуб у Лукоморья', () => new THREE.Vector3(3, 0, 5)], ['Костёр', () => new THREE.Vector3(FIRE.x + 2, 0, FIRE.y + 2.5)], ['Огород деда', () => new THREE.Vector3(GARDEN.x + 3, 0, GARDEN.y - 4)], ['Болото Кикиморы', () => new THREE.Vector3(KIKI_POS.x - 3, 0, KIKI_POS.z + 3)], ['Берёзовая роща', () => new THREE.Vector3(GROVE.x + 5, 0, GROVE.y)], ['Портал', () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4)]];
+async function teleport() {
+  if (!st.pike) { ui.toast('Волшебных слов ты пока не знаешь…'); return; }
+  document.exitPointerLock(); player.locked = true;
+  const c = await ui.dialog('По щучьему велению', 'По щучьему велению, по моему хотению — хочу оказаться…', [...TP.map((t) => t[0]), 'Остаться здесь']);
+  if (c >= 0 && c < TP.length) {
+    const fade = document.getElementById('fade'); fade.style.opacity = 1; S.chime(); await wait(700);
+    player.pos.copy(TP[c][1]()); player.pos.y = H(player.pos.x, player.pos.z); camera.position.copy(player.pos).add(new THREE.Vector3(0, 4, 8));
+    fade.style.opacity = 0;
+  }
+  player.locked = false;
+}
+async function koloCatch() {
+  player.locked = true; document.exitPointerLock();
+  await ui.say(KOLO, ['Ой! Догнал! Я Колобок, Колобок! По амбару метён, по сусеку скребён, на сметане мешён…', 'Я от бабушки ушёл, я от дедушки ушёл, от зайца ушёл, от волка ушёл, от медведя ушёл — а от тебя, Иван, не ушёл!']);
+  const c = await ui.dialog(KOLO, 'Ну что… съешь меня?', ['Съем! (облизнуться)', 'Нет. Давай лучше дружить!']);
+  if (c === 0) { await ui.say(KOLO, ['Все так говорят! А в конце всегда приходит лиса… Нет уж — я покатился!']); kolo.cd = 3.5; S.laugh(); }
+  else {
+    st.kolobok = 1; save(); S.chime();
+    await ui.say(KOLO, ['Дружить? Со мной ещё никто не дружил! Все только съесть хотели…', 'Тогда я буду катиться впереди и показывать дорогу. Я тут каждую кочку знаю! Захочешь подсказку — нажми F рядом со мной.']);
+    addBook('Колобок', 'Колобок от всех уходил — от бабушки, от дедушки, от зайца, волка и медведя. Иван догнал его, но не съел, а предложил дружбу. Теперь Колобок катится впереди и показывает дорогу — ведь он знает каждую кочку Лукоморья.');
+  }
+  player.locked = false;
+}
+function objective() {
+  if (st.stage === 0) return [cat.position, 'к коту учёному у дуба'];
+  if (st.stage === 1) {
+    if (!st.links.mermaid) return [MERMAID_GROUND, 'к русалке на ветвях дуба — у неё загадки'];
+    if (!st.links.grove) return [new THREE.Vector3(GROVE.x, 0, GROVE.y), st.groveCleared ? 'в берёзовую рощу — звено видно только взглядом (Q)' : 'в берёзовую рощу — там забудки'];
+    if (!st.links.kiki) return [KIKI_POS, 'на болото к Кикиморе — её надо рассмешить'];
+  }
+  if (st.stage === 2) return [OAK, 'к дубу — скрепить цепь'];
+  if (!st.pushkin) return [cat.position, 'к коту — послушай его стихи внимательно'];
+  if (st.turnip === 0 || st.turnip === 3 ? false : true) return st.turnip === 1 ? [MOUSE3, 'к старому пню — там мышка-норушка (Q)'] : [GARDEN3, 'к деду — тянуть репку'];
+  if (st.turnip === 0) return [GARDEN3, 'к деду на огород — у него беда с репкой'];
+  if (!st.pike) return [PIKE3, 'на берег — там кто-то бьётся на песке'];
+  const f = FEATHERS.find((f) => !st.feathers[f.i]);
+  if (f) return [f.g.position, 'к перу Жар-птицы' + (f.hidden ? ' (оно видно только взглядом)' : '')];
+  return [PORTAL3, 'к порталу в Дремучий лес'];
+}
+async function koloTalk() { const [, txt] = objective(); await ui.say(KOLO, [`Покатили ${txt}! Я впереди.`]); }
+function collectFeather(f) {
+  st.feathers[f.i] = true; f.g.visible = false; save(); S.chime(); burst(f.g.position.clone(), 0xff8a2a, 40, 4, 1.2, 0.25);
+  const n = st.feathers.filter(Boolean).length; ui.toast(`🪶 Перо Жар-птицы ${n}/7`, n === 7);
+  if (n === 7) {
+    setTimeout(async () => {
+      player.locked = true; document.exitPointerLock();
+      await ui.say('Жар-птица', ['(Над Лукоморьем вспыхивает золотой огонь — это Жар-птица прилетела за своими перьями.)', 'Ты собрал мои перья и не оставил себе ни одного. Не всякий так сможет!', 'Возьми слово, Сказитель. И пусть Слово твоё теперь восполняется вдвое быстрее.']);
+      addWord('Жар-птица', 'волшебная птица, чьи перья светят, как огонь. Её свет помогает находить дорогу в любую сказку.');
+      addBook('Жар-птица', 'По всему Лукоморью рассыпались перья Жар-птицы — некоторые видны только Сказительским взглядом. Иван собрал все семь и вернул их хозяйке. Жар-птица подарила ему забытое слово и силу быстрее восполнять Слово.');
+      player.locked = false;
+    }, 800);
+  }
+}
+
+// ---------- миникарта ----------
+const mm = document.getElementById('minimap'), mctx = mm.getContext('2d');
+function drawMinimap() {
+  const W = mm.width, c = W / 2, k = (W / 2 - 6) / 56; const X = (x) => c + x * k, Z = (z) => c + z * k;
+  mctx.clearRect(0, 0, W, W);
+  const g = (a, b) => { const t = life; return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`; };
+  mctx.fillStyle = g([120, 128, 138], [60, 140, 210]); mctx.beginPath(); mctx.arc(c, c, W / 2, 0, 7); mctx.fill();
+  mctx.fillStyle = g([190, 185, 170], [240, 214, 150]); mctx.beginPath(); mctx.arc(c, c, 54 * k, 0, 7); mctx.fill();
+  mctx.fillStyle = g([150, 156, 150], [100, 180, 80]); mctx.beginPath(); mctx.arc(c, c, 47 * k, 0, 7); mctx.fill();
+  mctx.fillStyle = g([110, 115, 110], [70, 95, 60]); mctx.beginPath(); mctx.arc(X(SWAMP.x), Z(SWAMP.y), 9 * k, 0, 7); mctx.fill();
+  mctx.font = '13px serif'; mctx.textAlign = 'center'; mctx.textBaseline = 'middle';
+  [['🌳', 0, 0], ['🔥', FIRE.x, FIRE.y], ['🌀', PORTAL.x, PORTAL.y], ['🪨', STONE.x, STONE.y], ['🥕', GARDEN.x, GARDEN.y], ['🐸', KIKI_POS.x, KIKI_POS.z]].forEach(([e, x, z]) => mctx.fillText(e, X(x), Z(z)));
+  const [op] = objective(); const pulse = 3 + Math.sin(T * 5) * 1.5;
+  mctx.fillStyle = '#ffd23f'; mctx.beginPath(); mctx.arc(X(op.x), Z(op.z), pulse, 0, 7); mctx.fill();
+  mctx.save(); mctx.translate(X(player.pos.x), Z(player.pos.z)); mctx.rotate(-player.facing + Math.PI);
+  mctx.fillStyle = '#d63a2f'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.moveTo(0, -7); mctx.lineTo(5, 5); mctx.lineTo(-5, 5); mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore();
+}
+
+// ---------- обновление новых сказок ----------
+function updateTales(dt, canMove) {
+  const p = player;
+  // мышка
+  if (st.turnip >= 2) { const tgt = GARDEN3.clone().add(new THREE.Vector3(-1.4, 0, 1.2)); mouse.position.lerp(tgt, Math.min(1, dt * 0.8)); mouse.position.y = H(mouse.position.x, mouse.position.z); mouse.visible = true; }
+  else mouse.visible = p.sight; mouse.rotation.y = T * 0.5;
+  if (st.turnip === 3 && turnip.position.y < H(GARDEN.x, GARDEN.y)) { turnip.position.set(GARDEN.x + 2.5, H(GARDEN.x + 2.5, GARDEN.y) + 0.6, GARDEN.y); turnip.rotation.z = -1.4; }
+  // щука
+  if (!st.pike) { pike.rotation.z = Math.sin(T * 6) * 0.3; pike.userData.tail.rotation.y = Math.sin(T * 10) * 0.5; pike.position.y = PIKE3.y + Math.abs(Math.sin(T * 3)) * 0.25; } else pike.visible = false;
+  // колобок
+  const kb = kolobok; const kp = kb.position; kolo.cd = Math.max(0, kolo.cd - dt);
+  let move = new THREE.Vector3();
+  if (st.kolobok === 1) {
+    const [op] = objective(); const dir = new THREE.Vector3(op.x - p.pos.x, 0, op.z - p.pos.z); const far = dir.length() > 6;
+    dir.normalize(); const want = p.pos.clone().addScaledVector(far ? dir : new THREE.Vector3(1, 0, 0), far ? 3.5 : 1.8);
+    move.set(want.x - kp.x, 0, want.z - kp.z); if (move.length() > 0.2) move.normalize().multiplyScalar(Math.min(10, move.length() * 4));
+    else move.set(0, 0, 0);
+  } else if (canMove) {
+    const d = new THREE.Vector3(kp.x - p.pos.x, 0, kp.z - p.pos.z); const dist = d.length();
+    if (dist < 7 || kolo.cd > 0) { move.copy(d.normalize()).multiplyScalar(kolo.cd > 0 ? 10 : 7.6); if (!kolo.sang || T - kolo.sang > 6) { kolo.sang = T; ui.toast('🎵 «Я от бабушки ушёл, я от дедушки ушёл…»', false, 2000); S.laugh(); } }
+    else { kolo.a += dt * 0.25; const tx = KOLO_HOME.x + Math.cos(kolo.a) * 9, tz = KOLO_HOME.y + Math.sin(kolo.a) * 9; move.set(tx - kp.x, 0, tz - kp.z); if (move.length() > 0.1) move.normalize().multiplyScalar(2.5); }
+    if (dist < 1.6 && kolo.cd <= 0 && !p.locked) koloCatch();
+  }
+  kolo.vel.lerp(move, Math.min(1, dt * 6)); kp.addScaledVector(kolo.vel, dt);
+  const kr = Math.hypot(kp.x, kp.z); if (kr > 45) { kp.x *= 45 / kr; kp.z *= 45 / kr; kolo.vel.set(-kp.z, 0, kp.x).normalize().multiplyScalar(7); }
+  for (const c of colliders) { const dx = kp.x - c.x, dz = kp.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.5; if (d < m && d > 0.001) { kp.x = c.x + (dx / d) * m; kp.z = c.z + (dz / d) * m; } }
+  kp.y = H(kp.x, kp.z) + 0.5 + (st.kolobok ? Math.abs(Math.sin(T * 6)) * 0.15 : 0);
+  const sp = kolo.vel.length(); if (sp > 0.1) { kb.rotation.y = Math.atan2(kolo.vel.x, kolo.vel.z); kb.userData.body.rotation.x += (sp * dt) / 0.5; }
+  // перья
+  FEATHERS.forEach((f) => {
+    if (st.feathers[f.i]) { f.g.visible = false; return; }
+    f.g.visible = !f.hidden || p.sight; f.g.rotation.y += dt * 1.5; f.g.position.y = H(f.g.position.x, f.g.position.z) + 1 + Math.sin(T * 2 + f.i) * 0.2;
+    if (f.g.visible && canMove && Math.hypot(f.g.position.x - p.pos.x, f.g.position.z - p.pos.z) < 1.6) collectFeather(f);
+  });
+  // дед покачивается
+  ded.rotation.z = Math.sin(T * 1.3) * 0.03;
+  if (started && (Math.floor(T * 10) % 2 === 0)) drawMinimap();
+}
+
+// ---------- настройки и сенсорное управление ----------
+const settingsEl = document.getElementById('settings');
+function toggleSettings(open) { settingsEl.classList.toggle('hidden', !open); ui.bookOpen = open; if (open) document.exitPointerLock(); }
+document.getElementById('btnGear').onclick = () => toggleSettings(true);
+document.getElementById('optClose').onclick = () => toggleSettings(false);
+document.getElementById('optReset').onclick = () => { if (confirm('Начать сказку заново? Прогресс сотрётся.')) { localStorage.removeItem(SAVE_KEY); location.reload(); } };
+document.getElementById('optVol').oninput = (e) => { if (S.master) S.master.gain.value = +e.target.value; localStorage.setItem('tri_vol', e.target.value); };
+document.getElementById('optSens').oninput = (e) => { sens = +e.target.value; localStorage.setItem('tri_sens', e.target.value); };
+document.getElementById('optHelp').onchange = (e) => document.getElementById('help').classList.toggle('hidden', !e.target.checked);
+if (localStorage.getItem('tri_sens')) { sens = +localStorage.getItem('tri_sens'); document.getElementById('optSens').value = sens; }
+if (localStorage.getItem('tri_vol')) document.getElementById('optVol').value = localStorage.getItem('tri_vol');
+const joy = { x: 0, y: 0, id: null };
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) {
+  document.getElementById('touch').classList.remove('hidden'); document.getElementById('help').classList.add('hidden');
+  const jz = document.getElementById('joy'), knob = document.getElementById('joyKnob');
+  const setJ = (t) => { const r = jz.getBoundingClientRect(); let dx = t.clientX - (r.left + r.width / 2), dy = t.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy), mx = r.width / 2 - 20; if (l > mx) { dx *= mx / l; dy *= mx / l; } joy.x = dx / mx; joy.y = dy / mx; knob.style.transform = `translate(${dx}px,${dy}px)`; };
+  jz.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.changedTouches[0]; joy.id = t.identifier; setJ(t); }, { passive: false });
+  jz.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joy.id) setJ(t); }, { passive: false });
+  const endJ = (e) => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; } };
+  jz.addEventListener('touchend', endJ); jz.addEventListener('touchcancel', endJ);
+  const acts = { attack: () => attack(), interact: () => (ui.dialogOpen ? ui._advance() : interact()), sight: () => toggleSight(), jump: () => { if (player.onGround) { player.vy = 9; player.onGround = false; } }, luck: () => luck(), book: () => ui.book(st, !ui.bookOpen) };
+  document.querySelectorAll('#tbtns button').forEach((b) => b.addEventListener('touchstart', (e) => { e.preventDefault(); if (!started) return; if (b.dataset.a !== 'book' && b.dataset.a !== 'interact' && (ui.busy() || player.locked)) return; acts[b.dataset.a](); }, { passive: false }));
+  let camT = null;
+  canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; camT = { id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens)); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
+}
+
 // ---------- трекер ----------
 function trackerHtml() {
   const ck = (b) => (b ? '☑' : '☐');
-  if (st.stage === 0) return '<b>📜 Пробуждение</b><br>• Поговори с Котом учёным у дуба (F)';
-  if (st.stage === 1) return `<b>📜 Цепь златая</b><br>${ck(st.links.mermaid)} Звено русалки — загадки (${st.riddle}/3)<br>${ck(st.links.grove)} Звено берёзовой рощи${st.groveCleared ? '' : ' — забудки'}<br>${ck(st.links.kiki)} Звено Кикиморы — болото<br><i style="opacity:.8">Q — увидеть Нити Сказа</i>`;
-  if (st.stage === 2) return '<b>📜 Цепь златая</b><br>• Скрепи цепь у дуба (F у ствола)';
-  return `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (и проверь, не ошибся ли он)'}<br>• Портал в Дремучий лес проснулся<br><span style="opacity:.8">Книга Сказов: ${st.book.length} · Слова: ${st.words.length}/5</span>`;
+  let h;
+  if (st.stage === 0) h = '<b>📜 Пробуждение</b><br>• Поговори с Котом учёным у дуба (F)';
+  else if (st.stage === 1) h = `<b>📜 Цепь златая</b><br>${ck(st.links.mermaid)} Звено русалки — загадки (${st.riddle}/3)<br>${ck(st.links.grove)} Звено берёзовой рощи${st.groveCleared ? '' : ' — забудки'}<br>${ck(st.links.kiki)} Звено Кикиморы — болото<br><i style="opacity:.8">Q — увидеть Нити Сказа</i>`;
+  else if (st.stage === 2) h = '<b>📜 Цепь златая</b><br>• Скрепи цепь у дуба (F у ствола)';
+  else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>• Портал в Дремучий лес проснулся`;
+  if (st.stage >= 1) {
+    const nf = st.feathers.filter(Boolean).length;
+    h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7`;
+  }
+  return h + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/5 · Слова: ${st.words.length}/5</span>`;
 }
 
 // ---------- цикл ----------
 const clock = new THREE.Clock(); let T = 0; let started = false;
-const tmpV = new THREE.Vector3();
+const tmpV = new THREE.Vector3(); const ray = new THREE.Raycaster();
 function update(dt) {
   T += dt;
   // жизнь мира
   if (Math.abs(life - lifeTarget) > 0.002) { life += Math.sign(lifeTarget - life) * Math.min(Math.abs(lifeTarget - life), dt * (lifeTarget === 1 ? 0.28 : 0.4)); }
   if (Math.abs(life - lifeShown) > 0.004) { applyLife(life); lifeShown = life; }
-  const skyTarget = tmpV; // unused helper
-  const sky = SKY_GRAY.clone().lerp(SKY_LIVE, life); if (player.sight) sky.lerp(SKY_SIGHT, 0.55);
-  scene.background.lerp(sky, Math.min(1, dt * 4)); scene.fog.color.copy(scene.background);
+  const sk = Math.min(1, dt * 4);
+  const top = SKY.topGray.clone().lerp(SKY.topLive, life), bot = SKY.botGray.clone().lerp(SKY.botLive, life);
+  if (player.sight) { top.lerp(SKY.topSight, 0.6); bot.lerp(SKY.botSight, 0.5); }
+  skyMat.uniforms.top.value.lerp(top, sk); skyMat.uniforms.bottom.value.lerp(bot, sk);
+  scene.background.copy(skyMat.uniforms.bottom.value); scene.fog.color.copy(scene.background);
+  skyDome.position.copy(camera.position);
+  clouds.forEach((c) => { c.position.x += dt * c.userData.sp; if (c.position.x > 130) c.position.x = -130; });
 
   // игрок
   const p = player; const canMove = started && !ui.busy() && !p.locked;
@@ -587,8 +910,9 @@ function update(dt) {
     if (keys.has('ArrowLeft')) camYaw += dt * 2; if (keys.has('ArrowRight')) camYaw -= dt * 2;
     let ix = 0, iz = 0;
     if (keys.has('KeyW')) iz -= 1; if (keys.has('KeyS')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
+    if (joy.id !== null) { ix += joy.x; iz += joy.y; }
     const blocking = keys.has('KeyK') || mouseBlock;
-    let speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1);
+    let speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.85 ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1);
     if (ix || iz) {
       const l = Math.hypot(ix, iz); ix /= l; iz /= l;
       const sx = Math.sin(camYaw), cz = Math.cos(camYaw);
@@ -605,7 +929,7 @@ function update(dt) {
   p.vy -= 26 * dt; p.pos.y += p.vy * dt; if (p.pos.y <= gh) { p.pos.y = gh; p.vy = 0; p.onGround = true; }
   p.attackT = Math.max(0, p.attackT - dt); p.hurtT = Math.max(0, p.hurtT - dt); p.buffT = Math.max(0, p.buffT - dt); p.speedT = Math.max(0, p.speedT - dt); p.luckCd = Math.max(0, p.luckCd - dt);
   if (p.sight) { p.word -= dt * 9; if (p.word <= 0) { p.word = 0; toggleSight(false); ui.toast('Слово иссякло. Отдохни у костра.'); } }
-  else p.word = Math.min(100, p.word + dt * 2.5);
+  else p.word = Math.min(100, p.word + dt * (st.feathers.every(Boolean) ? 6 : 2.5));
   if (p.pos.distanceTo(FIRE3) < 4) { p.word = Math.min(100, p.word + dt * 30); if (T % 1.5 < dt) p.hp = Math.min(p.maxHp, p.hp + 1); }
 
   ivan.position.copy(p.pos); ivan.rotation.y = p.facing;
@@ -669,9 +993,18 @@ function update(dt) {
   }
   if (ringT >= 0) { ringT += dt; const s = ringT * 28; ring.scale.setScalar(s); ring.material.opacity = Math.max(0, 0.8 - ringT * 0.27); if (ringT > 3) ringT = -1; }
 
+  updateTales(dt, canMove);
+
   // камера
   const tgt = p.pos.clone().add(new THREE.Vector3(0, 1.7, 0));
   const cp = new THREE.Vector3(Math.sin(camYaw) * Math.cos(camPitch) * camDist, Math.sin(camPitch) * camDist, Math.cos(camYaw) * Math.cos(camPitch) * camDist).add(tgt);
+  { // «пружинная» камера: не прячемся за деревьями
+    const dir = cp.clone().sub(tgt); const len = dir.length(); dir.normalize();
+    ray.set(tgt, dir); ray.far = len;
+    const near = camBlockers.filter((o) => Math.hypot(o.position.x - p.pos.x, o.position.z - p.pos.z) < len + 6);
+    const hit = ray.intersectObjects(near, true)[0];
+    if (hit) cp.copy(tgt).addScaledVector(dir, Math.max(1.6, hit.distance - 0.4));
+  }
   cp.y = Math.max(cp.y, H(cp.x, cp.z) + 0.6, 0.6);
   camera.position.lerp(cp, Math.min(1, dt * 10)); camera.lookAt(tgt);
   sun.position.copy(p.pos).add(new THREE.Vector3(25, 45, 18)); sun.target.position.copy(p.pos);
@@ -691,6 +1024,9 @@ function startGame(cont) {
   else { st = freshState(); save(); }
   if (st.restored) { GAPS.forEach((g) => (chainLinks[g].visible = true)); S.startMusic(); }
   life = lifeTarget = baseLife(); lifeShown = -1;
+  player.maxHp = st.turnip === 3 ? 6 : 5; player.hp = player.maxHp;
+  if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
+  if (S.master && localStorage.getItem('tri_vol')) S.master.gain.value = +localStorage.getItem('tri_vol');
   spawnEnemies();
   document.getElementById('title').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -702,5 +1038,5 @@ if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont
 // фон титульного экрана: медленный облёт
 camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
-window.__game = { st: () => st, player, startGame, ui, enemies, attack, toggleSight, setLife: (v) => (lifeTarget = v) };
+window.__game = { st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeTarget = v) };
 loop();
