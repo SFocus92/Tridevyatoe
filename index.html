@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Тридевятое: Сказитель — вертикальный срез</title>
+<link rel="stylesheet" href="style.css" />
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="sightFx"></div>
+<div id="hurtFx"></div>
+<div id="fade"></div>
+
+<div id="hud" class="hidden">
+  <div id="stats">
+    <div id="hearts"></div>
+    <div class="bar"><div id="word"></div><span>Слово</span></div>
+    <div id="luck"></div>
+  </div>
+  <div id="tracker"></div>
+  <div id="prompt"></div>
+  <div id="toasts"></div>
+  <div id="help">WASD — идти · Shift — бежать · Пробел — прыжок · Мышь — камера (клик, чтобы захватить)<br>
+  ЛКМ/J — удар · ПКМ/K — блок · Q — Сказительский взгляд · R — Удача дурака · F — действие · B — Книга Сказов · H — скрыть подсказку</div>
+</div>
+
+<div id="dialog" class="hidden">
+  <div id="dSpeaker"></div>
+  <div id="dText"></div>
+  <div id="dChoices"></div>
+  <div id="dHint">Пробел — дальше</div>
+</div>
+
+<div id="book" class="hidden">
+  <div class="bookInner">
+    <h2>📖 Книга Сказов</h2>
+    <div id="bookList"></div>
+    <h3>Забытые слова</h3>
+    <div id="wordList"></div>
+    <p class="muted">B — закрыть</p>
+  </div>
+</div>
+
+<div id="title">
+  <div class="titleInner">
+    <div class="orn">— ◆ —</div>
+    <h1>Тридевятое</h1>
+    <h2>Сказитель</h2>
+    <p class="tag">Кощей крадёт не жизни, а память о сказках.<br>Свяжи порванные Нити Сказа — и мир оживёт.</p>
+    <div class="btns">
+      <button id="btnNew">Новая сказка</button>
+      <button id="btnCont" class="hidden">Продолжить</button>
+    </div>
+    <p class="muted">Вертикальный срез · Лукоморье · Иван · квест «Цепь златая» · ~15 минут</p>
+    <p class="muted small">WASD · мышь · Q — взгляд · F — действие · ЛКМ — удар</p>
+  </div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

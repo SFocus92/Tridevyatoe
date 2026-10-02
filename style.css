@@ -1,0 +1,43 @@
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:Georgia,"Times New Roman",serif;color:#fff8e6}
+canvas{display:block;width:100vw;height:100vh}
+.hidden{display:none!important}
+#sightFx{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .4s;
+ background:radial-gradient(ellipse at center,rgba(255,215,90,0) 45%,rgba(255,200,60,.18) 75%,rgba(120,60,200,.45) 100%);box-shadow:inset 0 0 120px rgba(255,210,80,.5)}
+body.sight #sightFx{opacity:1}
+#hurtFx{position:fixed;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(150,160,200,.7));transition:opacity .25s}
+#fade{position:fixed;inset:0;background:#0b0b18;opacity:0;pointer-events:none;transition:opacity .8s}
+#hud>*{position:fixed}
+#stats{top:16px;left:16px;background:rgba(30,20,10,.45);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,210,120,.35)}
+#hearts{font-size:22px;letter-spacing:2px}
+.bar{position:relative;width:180px;height:14px;background:rgba(0,0,0,.4);border-radius:7px;margin-top:6px;overflow:hidden}
+.bar span{position:absolute;inset:0;font-size:10px;text-align:center;line-height:14px;letter-spacing:1px}
+#word{height:100%;background:linear-gradient(90deg,#ffcf4a,#ffe9a0);width:100%}
+#luck{font-size:12px;margin-top:6px;opacity:.9}
+#tracker{top:16px;right:16px;max-width:300px;background:rgba(30,20,10,.45);padding:12px 16px;border-radius:12px;border:1px solid rgba(255,210,120,.35);font-size:14px;line-height:1.5}
+#tracker b{color:#ffd76a}
+#prompt{bottom:22%;left:50%;transform:translateX(-50%);background:rgba(20,15,5,.7);padding:8px 16px;border-radius:20px;border:1px solid #ffd76a;font-size:15px;display:none}
+#toasts{top:18%;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none}
+.toast{background:rgba(20,15,5,.7);padding:8px 18px;border-radius:10px;margin:6px auto;font-size:16px;animation:tin .3s ease-out;width:max-content;max-width:80vw}
+.toast.big{font-size:30px;color:#ffd76a;background:none;text-shadow:0 0 18px rgba(255,200,60,.9),0 2px 4px #000}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}}
+#help{bottom:10px;left:16px;font-size:12px;opacity:.75;background:rgba(0,0,0,.3);padding:6px 10px;border-radius:8px;max-width:760px}
+#dialog{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);width:min(820px,94vw);background:linear-gradient(#2a1b0e,#1a1008);border:2px solid #c9953f;border-radius:14px;padding:16px 22px;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+#dSpeaker{color:#ffd76a;font-weight:bold;font-size:17px;margin-bottom:6px}
+#dText{font-size:18px;line-height:1.5;min-height:54px;white-space:pre-line}
+#dChoices button{display:block;width:100%;text-align:left;margin-top:8px;background:rgba(255,215,106,.08);color:#fff8e6;border:1px solid rgba(255,215,106,.4);border-radius:8px;padding:8px 12px;font:inherit;font-size:16px;cursor:pointer}
+#dChoices button:hover{background:rgba(255,215,106,.25)}
+#dHint{text-align:right;font-size:11px;opacity:.6;margin-top:6px}
+#book{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+.bookInner{width:min(680px,92vw);max-height:84vh;overflow:auto;background:#f3e3c0;color:#3a2410;border-radius:10px;padding:24px 32px;border:6px double #8a5a20}
+.entry{border-bottom:1px dashed #a07840;padding:10px 0}
+.entry h4{margin:0 0 4px;color:#9a2a1a}
+.muted{opacity:.7}.small{font-size:12px}
+#title{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(20,10,40,.55),rgba(5,5,15,.92))}
+.titleInner{text-align:center}
+.orn{color:#ffd76a;font-size:22px;letter-spacing:8px}
+#title h1{font-size:76px;margin:6px 0 0;color:#ffd76a;text-shadow:0 0 30px rgba(255,190,60,.7);letter-spacing:4px}
+#title h2{font-size:30px;margin:0 0 18px;font-weight:normal;letter-spacing:12px;text-transform:uppercase;color:#e8d6b0}
+.tag{font-size:18px;line-height:1.6;opacity:.9}
+.btns button{font:inherit;font-size:20px;margin:18px 8px;padding:12px 28px;border-radius:30px;border:2px solid #ffd76a;background:rgba(255,215,106,.12);color:#fff8e6;cursor:pointer}
+.btns button:hover{background:rgba(255,215,106,.3)}
