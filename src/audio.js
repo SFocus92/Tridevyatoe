@@ -16,6 +16,8 @@ export const THEMES = {
   night: { mode: 'minor', root: -3, beat: 0.5, lead: 'bell', drum: 0, pad: true, bass: [0, 3, 4, 0], mel: [[4, -99, 2, -99, 4, -99, 2, -99], [4, 3, 2, 1, 2, -99, -99, -99], [2, -99, 1, -99, 2, -99, 0, -99], [1, 0, -1, 1, 0, -99, -99, -99]] }, // колыбельная «Баю-баюшки-баю»
   finale: { mode: 'major', root: 0, beat: 0.26, lead: 'balalaika', drum: 1, pad: true, bass: [0, 3, 4, 0], mel: [[0, 2, 4, 5, 4, 2, 4, 7], [5, 4, 2, 4, 2, 1, 0, -99], [4, 4, 5, 7, 5, 4, 2, 4], [2, 1, 2, 4, 0, -99, 0, -99]] },
 };
+// длительности петель (сек) — пишет tools/render_music.js
+export const MUSIC_LEN = { luk: 28.8, forest: 34.56, mountains: 26.88, rivers: 25.92, koschei: 38.4, boss: 21.12, night: 32, finale: 24.96 }; // длины петель в assets/music (для плееров, не срезающих задержку mp3)
 export class Sound {
   constructor() {
     this.ctx = null; this.theme = 'luk'; this.color = 0.12; this.musicOn = false;
@@ -48,8 +50,8 @@ export class Sound {
   applyVolumes() { if (!this.ctx) return; const t = this.ctx.currentTime; this.master.gain.setTargetAtTime(this.vol.master, t, 0.05); this.music.gain.setTargetAtTime(this.vol.music * 0.9, t, 0.05); this.sfxBus.gain.setTargetAtTime(this.vol.sfx, t, 0.05); this.amb.gain.setTargetAtTime(this.vol.sfx * 0.9, t, 0.05); }
   setAmbience({ wind = 0.04, windFreq = 380, water = 0 } = {}) { if (!this.ctx) { this._amb = { wind, windFreq, water }; return; } const t = this.ctx.currentTime; this.wind.g.gain.setTargetAtTime(wind, t, 1); this.wind.fl.frequency.setTargetAtTime(windFreq, t, 1); this.water.g.gain.setTargetAtTime(water, t, 1); }
   setGray(g) { this.setColor(1 - g); }
-  setColor(life) { this.color = life; }
-  setTheme(name) { if (!THEMES[name] || name === this.theme) return; this.theme = name; this._step = 0; }
+  setColor(life) { this.color = life; if (this.musicLP && this.ctx) { const t = this.ctx.currentTime; this.musicLP.frequency.setTargetAtTime(450 + life * life * 15500, t, 0.4); this.trackBus.gain.setTargetAtTime(0.5 + 0.5 * life, t, 0.4); } } // серый мир — музыка глуше и тише
+  setTheme(name) { if (!THEMES[name] || name === this.theme) return; this.theme = name; this._step = 0; if (this.musicOn) this._playTrack(name); }
   // ---------- инструменты ----------
   _out(bus) { return bus === 'music' ? this.music : this.sfxBus; }
   pluck(freq, t = 0, vol = 0.2, dur = 1.6, bus = 'sfx') { // гусли
@@ -93,14 +95,45 @@ export class Sound {
     const g = c.createGain(); g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur); o.connect(g); g.connect(this._out(bus)); o.start(now); o.stop(now + dur + 0.02);
   }
   // ---------- музыка ----------
+  // Фоновая музыка играет из готовых файлов assets/music/*.mp3 (отрендерены из этих же тем tools/render_music.js):
+  // никакого планировщика нот на главном потоке — звук не «заикается», когда тормозит кадр, а файлы кэшируются браузером.
+  // Если файл не загрузился — запасной вариант: живой синтез нот (_startSynth).
   startMusic() {
-    if (!this.ctx || this.musicOn) return; this.musicOn = true; this._step = 0; this._next = this.ctx.currentTime + 0.3;
+    if (!this.ctx || this.musicOn) return; this.musicOn = true;
+    if (!this.musicLP) { const c = this.ctx; this.musicLP = c.createBiquadFilter(); this.musicLP.type = 'lowpass'; this.musicLP.frequency.value = 16000; this.trackBus = c.createGain(); this.musicLP.connect(this.trackBus); this.trackBus.connect(this.music); this.setColor(this.color); }
+    this._playTrack(this.theme);
+    // заранее скачиваем остальные темы (только файлы, без распаковки) — переход между краями без пауз
+    setTimeout(() => Object.keys(THEMES).forEach((n, i) => setTimeout(() => this._fetchTrack(n), i * 700)), 4000);
+  }
+  _fetchTrack(name) { this._files ||= {}; return (this._files[name] ||= fetch(`assets/music/${name}.mp3`).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null)); }
+  async _decode(name) {
+    this._dec ||= {}; if (this._dec[name]) return this._dec[name];
+    const ab = await this._fetchTrack(name); if (!ab) return null;
+    const buf = await new Promise((res) => { try { this.ctx.decodeAudioData(ab.slice(0), res, () => res(null)); } catch { res(null); } });
+    if (buf) { this._dec[name] = buf; const keep = new Set([name, this._curName]); Object.keys(this._dec).forEach((k) => { if (!keep.has(k)) delete this._dec[k]; }); } // в памяти не больше двух тем
+    return buf;
+  }
+  async _playTrack(name) {
+    const tok = (this._tok = (this._tok || 0) + 1);
+    const buf = await this._decode(name); if (tok !== this._tok || !this.ctx) return;
+    if (!buf) { if (!this._synthOn) this._startSynth(); return; }
+    if (this._cur && this._curName === name) return; // та же тема уже звучит — не перезапускаем
+    if (this._synthOn) { clearInterval(this._music); this._synthOn = false; }
+    const c = this.ctx, now = c.currentTime;
+    if (this._cur) { const o = this._cur; o.g.gain.cancelScheduledValues(now); o.g.gain.setValueAtTime(o.g.gain.value, now); o.g.gain.linearRampToValueAtTime(0, now + 1.4); setTimeout(() => { try { o.src.stop(); } catch {} o.g.disconnect(); }, 1700); }
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const L = MUSIC_LEN[name]; if (L && buf.duration - L > 0.004) { src.loopStart = Math.min(buf.duration - L, 1105 / 44100); src.loopEnd = src.loopStart + L; }
+    const g = c.createGain(); g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(1, now + 1.4); src.connect(g); g.connect(this.musicLP);
+    src.start(now, src.loopStart || 0); this._cur = { src, g }; this._curName = name;
+  }
+  _startSynth() {
+    this._synthOn = true; this._step = 0; this._next = this.ctx.currentTime + 0.3;
     this._music = setInterval(() => this._tick(), 90);
   }
-  _tick() {
-    const c = this.ctx; if (!c || c.state !== 'running') return;
-    while (this._next < c.currentTime + 0.35) {
-      const th = THEMES[this.theme]; const s = this._step, t = this._next - c.currentTime; const root = th.root;
+  _tick() { const c = this.ctx; if (!c || c.state !== 'running') return; this._sched(c.currentTime + 0.35, c.currentTime); }
+  _sched(limit, base) { // планировщик нот темы (живой синтез и рендер файлов tools/render_music.html)
+    while (this._next < limit) {
+      const th = THEMES[this.theme]; const s = this._step, t = this._next - base; const root = th.root;
       const bar = Math.floor(s / 8) % th.mel.length, i = s % 8; const n = th.mel[bar][i];
       const live = this.color; const dense = live > 0.6 || i % 2 === 0; // в сером мире музыка редеет
       const F = (d, o = 0) => f(deg(th.mode, d) + root + o);

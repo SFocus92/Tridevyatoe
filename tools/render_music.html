@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><title>render music</title>
+<script type="module">
+// Рендер фоновых тем из src/audio.js в файлы (OfflineAudioContext) — запускается tools/render_music.js
+import { Sound, THEMES } from '../src/audio.js';
+window.renderTheme = async (name, cycles = 2) => {
+  const th = THEMES[name]; const cyc = th.mel.length * 8 * th.beat; const sr = 44100;
+  const total = cyc * (cycles + 1) + 4; const off = new OfflineAudioContext(2, Math.ceil(total * sr), sr);
+  const RealC = window.AudioContext; window.AudioContext = function () { return off; };
+  const S = new Sound(); S.startMusic = () => {}; S.init(); window.AudioContext = RealC;
+  S.vol = { master: 1, music: 1, sfx: 0 }; S.master.gain.value = 1; S.music.gain.value = 0.9; S.sfxBus.gain.value = 0; S.amb.gain.value = 0;
+  S.wind.g.gain.cancelScheduledValues(0); S.wind.g.gain.value = 0; S.water.g.gain.cancelScheduledValues(0); S.water.g.gain.value = 0;
+  S.theme = name; S.color = 1; S._step = 0; S._next = 0.02;
+  S._sched(cyc * (cycles + 1), 0);
+  const buf = await off.startRendering();
+  // берём циклы [1 .. cycles+1): в начало попадают «хвосты» предыдущего цикла — петля бесшовная
+  const a = Math.round(cyc * sr), n = Math.round(cyc * cycles * sr);
+  const out = new Int16Array(n * 2); let peak = 0;
+  for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[a + i])); }
+  const k = peak > 0.95 ? 0.95 / peak : 1;
+  for (let ch = 0; ch < 2; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < n; i++) out[i * 2 + ch] = Math.max(-32767, Math.min(32767, d[a + i] * k * 32767)); }
+  let bin = ''; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return { b64: btoa(bin), sr, seconds: cyc * cycles, peak };
+};
+window.ready = true;
+</script>

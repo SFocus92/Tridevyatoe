@@ -22,6 +22,8 @@ export const RETELL = {
   'Теремок': ['Кто не поместился в теремке?', 'Медведь косолапый', 'Мышка-норушка', 'Лягушка-квакушка'],
   'Курочка Ряба': ['Кто разбил золотое яичко?', 'Мышка хвостиком махнула', 'Дед', 'Курочка'],
   'Заюшкина избушка': ['Кто выгнал лису из заюшкиной избушки?', 'Петух с косой', 'Собаки', 'Медведь'],
+  'Сивка-Бурка': ['Как позвать Сивку-Бурку?', '«Встань передо мной, как лист перед травой!»', '«Но, лошадка, вперёд!»', '«Сим-сим, откройся»'],
+  'Царевна-лягушка': ['Кем обернулась лягушка?', 'Василисой Премудрой', 'Бабой-Ягой', 'Снегурочкой'],
   'Лиса и журавль': ['Чем лиса угостила журавля?', 'Кашей, размазанной по тарелке', 'Пирогами', 'Окрошкой в кувшине'],
 };
 
@@ -77,6 +79,21 @@ export const NIGHT_TALES = [
     { ask: 'Чем ответил журавль, когда позвал лису к себе?', right: 'Окрошкой в кувшине с узким горлышком', wrong: ['Кашей на тарелке', 'Мёдом в бочке'], show: ['jug'], hide: ['plate'], after: 'Лиса вертится вокруг кувшина — ни лизнуть, ни понюхать. А журавль клюёт себе да клюёт.' },
     { ask: 'Чем кончилась их дружба?', right: 'Как аукнулось, так и откликнулось', wrong: ['Стали лучшими друзьями', 'Открыли харчевню'], after: 'С тех пор и дружба у лисы с журавлём врозь.' },
   ] },
+  { id: 'sivka', title: 'Сивка-Бурка', moral: 'Мур. Доброе сердце и верное слово сильнее насмешек.', steps: [
+    { say: 'Перед смертью отец велел сыновьям три ночи стеречь его могилу. Старшие испугались, а пошёл младший — Иванушка-дурачок.' },
+    { ask: 'В полночь пришёл чудесный конь. Какими словами его зовут?', right: '«Сивка-бурка, вещая каурка, встань передо мной, как лист перед травой!»', wrong: ['«Конь-огонь, скачи ко мне!»', '«По щучьему велению»'], show: ['horse'], after: 'Влез Иван коню в одно ухо, а из другого вылез — да таким молодцем, что ни в сказке сказать, ни пером описать!' },
+    { say: 'А царь объявил: кто на коне допрыгнет до высокого терема и поцелует царевну в окошке — тот на ней и женится.', show: ['tower'] },
+    { ask: 'С какой попытки допрыгнул Иван до окошка?', right: 'С третьей', wrong: ['С первой', 'Так и не допрыгнул'], act: 'jump', after: 'Раз — не допрыгнул, два — чуть-чуть, а на третий раз — до самого окошка! Поцеловал царевну, а она приложила ему ко лбу свой перстень.' },
+    { ask: 'Как царевна узнала Ивана на пиру?', right: 'По печати от перстня на лбу', wrong: ['По голосу', 'По красным сапогам'], show: ['ring'], after: 'Братья смеялись над дурачком, а царевна сразу увидела печать — и сыграли весёлую свадьбу.' },
+  ] },
+  { id: 'frog', title: 'Царевна-лягушка', moral: 'Мур. Не по виду судят — по делам. И не торопи чудо: оно приходит в своё время.', steps: [
+    { say: 'Велел царь трём сыновьям пустить по стреле: куда упадёт стрела — там и невесту искать.', show: ['arrow'] },
+    { ask: 'Куда упала стрела Ивана-царевича?', right: 'В болото, к лягушке', wrong: ['На купеческий двор', 'В царский сад'], show: ['frog'], after: '«Квак! Возьми меня замуж, Иван-царевич». Делать нечего — взял он лягушку.' },
+    { ask: 'Что лягушка испекла царю за одну ночь?', right: 'Пышный белый каравай', wrong: ['Горелый блин', 'Ничего не испекла'], show: ['loaf'] },
+    { say: 'На пиру лягушка обернулась Василисой Премудрой: махнула левым рукавом — разлилось озеро, махнула правым — поплыли белые лебеди.', act: 'princess' },
+    { ask: 'Что натворил Иван, пока Василиса плясала?', right: 'Сжёг лягушачью кожу', wrong: ['Спрятал кожу в сундук', 'Отдал кожу царю'], act: 'burn', after: 'И пропала Василиса: «Ищи меня за тридевять земель, в царстве Кощея Бессмертного…»' },
+    { ask: 'Чем кончилась сказка?', right: 'Иван нашёл Василису и одолел Кощея', wrong: ['Василиса осталась лягушкой', 'Иван про неё забыл'], act: 'dance', after: 'Добрые звери помогли ему, достал он Кощееву смерть — и вернулся домой с Василисой. Тут и сказке конец!' },
+  ] },
 ];
 export const NIGHT_TOTAL = NIGHT_TALES.length;
 
@@ -116,7 +133,7 @@ export function initEvening(c, X) {
     fb.userData.wings = [1, -1].map((sd) => { const piv = new THREE.Group(); piv.position.set(0.3 * sd, 0.15, 0); const w = new THREE.Mesh(wg, wm); w.rotation.x = -Math.PI / 2; w.scale.x = sd; piv.add(w); fb.add(piv); return piv; });
     [[0, 0xffc040], [0.35, 0xff5020], [-0.35, 0xff5020]].forEach(([a, col]) => { const t = new THREE.Mesh(new THREE.ConeGeometry(0.16, 2.4, 6), B(col)); t.rotation.x = -Math.PI / 2 - 0.25; t.rotation.z = a; t.position.set(a * 0.8, 0.1, -1.7); fb.add(t); });
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0xffa040, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(5); fb.add(glow); fb.userData.glow = glow; }
-  const PERCH = new THREE.Vector3(-4.5, 0, 6.5); PERCH.y = H(PERCH.x, PERCH.z) + 2.4;
+  const PERCH = X.FIREBIRD_SEAT ? X.FIREBIRD_SEAT.clone().add(new THREE.Vector3(0, 0.45, 0)) : new THREE.Vector3(-4.5, H(-4.5, 6.5) + 2.4, 6.5); // ветка дуба напротив русалки
   let perched = false;
 
   // ---------- сцена «Сказки на ночь» у костра ----------
@@ -135,12 +152,18 @@ export function initEvening(c, X) {
     egg: () => { const g = new THREE.Group(); const m = blob(0xfaf6ea, 0.3, 0.4, 0.3); m.position.y = 0.6; g.add(m); return g; },
     plate: () => { const g = new THREE.Group(); const p = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 0.06, 16), T3(0xf0e6d0)); p.position.y = 0.1; g.add(p); const k = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.02, 16), T3(0xe8c070)); k.position.y = 0.14; g.add(k); return g; },
     jug: () => { const g = new THREE.Group(); const b = blob(0xc0703a, 0.6, 0.7, 0.6); b.position.y = 0.4; g.add(b); const n = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.7), T3(0xc0703a)); n.position.y = 1.0; g.add(n); return g; },
+    horse: () => tint(c.pet('pets/deer', 1.35).root, 0x9a6a3a),
+    tower: () => { const g = new THREE.Group(); const w = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 3.4, 8), T3(0xe8d8b0)); w.position.y = 1.7; g.add(w); const r = new THREE.Mesh(new THREE.ConeGeometry(1.1, 1.4, 8), T3(0x2e7d32)); r.position.y = 4.1; g.add(r); const win = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.6), new THREE.MeshBasicMaterial({ color: 0xffd76a })); win.position.set(0, 2.9, 0.86); g.add(win); return g; },
+    ring: () => { const g = new THREE.Group(); const t = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.06, 8, 20), c.toon(0xffc93a, { emissive: 0x553300 }, true)); t.position.y = 1.4; g.add(t); return g; },
+    arrow: () => { const g = new THREE.Group(); const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), T3(0x8a5a2a)); sh.rotation.z = 1.2; sh.position.y = 0.45; g.add(sh); const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 6), T3(0x777777)); tip.position.set(-0.68, 0.18, 0); tip.rotation.z = 1.2 + Math.PI; g.add(tip); return g; },
+    loaf: () => { const g = new THREE.Group(); const b = blob(0xe0a050, 0.9, 0.5, 0.9); b.position.y = 0.3; g.add(b); return g; },
+    princess: () => { const ch = c.npc('vasilisa'); return ch.root; },
     bunny: () => c.pet('pets/bunny', 0.75).root, fox: () => c.pet('pets/fox', 0.85).root,
     wolf: () => tint(c.pet('pets/dog', 0.95).root, 0x9aa0aa), dog: () => c.pet('pets/dog', 0.85).root,
     bear: () => tint(c.pet('pets/hog', 1.5).root, 0x8a5a33), bull: () => c.pet('pets/cow', 1.0).root,
     hen: () => c.pet('pets/chick', 1.0).root, rooster: () => tint(c.pet('pets/chick', 1.25).root, 0xff8a6a),
   };
-  const SLOT = { terem: [0, 0, -1.2], hut: [1.4, 0, -1.2], iceHut: [-1.5, 0, -1.2], goldEgg: [0, 0, 0.3], egg: [0.5, 0, 0.3], plate: [0, 0, 0.5], jug: [0.6, 0, 0.5] };
+  const SLOT = { tower: [0.4, 0, -1.6], ring: [0, 0, 0.6], arrow: [-0.4, 0, 0.6], loaf: [0.5, 0, 0.5], terem: [0, 0, -1.2], hut: [1.4, 0, -1.2], iceHut: [-1.5, 0, -1.2], goldEgg: [0, 0, 0.3], egg: [0.5, 0, 0.3], plate: [0, 0, 0.5], jug: [0.6, 0, 0.5] };
   let slotI = 0;
   function show(key) {
     if (!stage) { stage = new THREE.Group(); stage.position.copy(STAGE); stage.lookAt(X.FIRE3.x, STAGE.y, X.FIRE3.z); lukGroup.add(stage); stage.userData.a = {}; slotI = 0; }
@@ -157,6 +180,10 @@ export function initEvening(c, X) {
     if (name === 'rebuild' && A.terem) { A.terem.userData.squash = 0; A.terem.userData.grow = 1.45; S.chime(); c.burst(w(A.terem).add(new THREE.Vector3(0, 1.5, 0)), 0xffd76a, 40, 4, 1.2, 0.2); Object.values(A).forEach((o) => (o.userData.dance = 1)); }
     if (name === 'breakEgg' && A.goldEgg) { c.burst(w(A.goldEgg).add(new THREE.Vector3(0, 0.6, 0)), 0xffc93a, 30, 3, 1, 0.16); A.goldEgg.visible = false; S.crack && S.crack(); }
     if (name === 'melt' && A.iceHut) { A.iceHut.userData.melt = 1; S.splash && S.splash(); }
+    if (name === 'jump' && A.horse) { A.horse.userData.hop = 1; S.stomp && S.stomp(); }
+    if (name === 'princess' && A.frog) { c.burst(w(A.frog).add(new THREE.Vector3(0, 0.6, 0)), 0x9ae86a, 40, 4, 1.2, 0.18); A.frog.visible = false; show('princess'); S.magic(); }
+    if (name === 'burn') { c.burst(X.FIRE3.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x4caf50, 30, 4, 1, 0.16); c.burst(X.FIRE3.clone().add(new THREE.Vector3(0, 1.4, 0)), 0xff9a2a, 30, 5, 1, 0.2); if (A.princess) A.princess.userData.leave = 1; S.dark && S.dark(); }
+    if (name === 'dance') { Object.values(A).forEach((o) => (o.userData.dance = 1)); if (A.princess) { A.princess.visible = true; A.princess.userData.leave = 0; A.princess.position.copy(A.princess.userData.base); } S.chime(); }
     if (name === 'foxRun' && A.fox) { A.fox.userData.leave = 1; Object.values(A).forEach((o) => (o.userData.dance = 1)); S.chime(); }
   }
   function updateStage(dt) {
@@ -167,6 +194,7 @@ export function initEvening(c, X) {
       if (u.grow) o.scale.setScalar(Math.min(u.grow * u.k, o.scale.x + dt));
       if (u.melt) { o.scale.y = Math.max(0.01, o.scale.y - dt * 0.6); if (o.scale.y <= 0.01) o.visible = false; }
       if (u.leave) { o.position.x += dt * 3; o.position.z += dt * 2; u.leave += dt; if (u.leave > 2.5) o.visible = false; }
+      if (u.hop) { u.hop += dt; const k = (u.hop - 1) % 1.2; o.position.y = Math.max(0, Math.sin(Math.min(1, k / 0.8) * Math.PI)) * (1 + Math.floor((u.hop - 1) / 1.2) * 0.9); if (u.hop > 4.6) { u.hop = 0; o.position.y = 0; } }
       if (u.dance) o.position.y = Math.abs(Math.sin(c.T() * 6 + o.position.x)) * 0.35;
     }
     if (!telling) { stageTimer -= dt; if (stageTimer <= 0) { lukGroup.remove(stage); stage = null; } }
@@ -245,7 +273,7 @@ export function initEvening(c, X) {
     try {
       await ui.say(CAT, [`Мур-р… Слушай сказку на ночь — «${tale.title}». А ты подсказывай, что было дальше.`]);
       for (const st of tale.steps) {
-        if (st.say) { (st.show || []).forEach(show); await ui.say(CAT, [st.say]); }
+        if (st.say) { (st.show || []).forEach(show); if (st.act) act(st.act); await ui.say(CAT, [st.say]); }
         if (st.ask) {
           const ans = shuffle([st.right, ...st.wrong]); let tries = 0;
           for (;;) { const k = await ui.dialog(CAT, st.ask, ans); if (ans[k] === st.right || tries >= 3) break; if (k < 0) continue; S.wrong(); tries++; await ui.say(CAT, [tries > 1 ? `Мур, подскажу: «${st.right}».` : 'Мур-мур, нет-нет. Вспомни-ка получше.']); }
@@ -302,5 +330,5 @@ export function initEvening(c, X) {
     const tr = Object.keys(NPC).map((k) => `<div class="entry">${NPC[k].name}: ${'💛'.repeat(Math.min(3, s.trust[k] || 0))}${'🤍'.repeat(Math.max(0, 3 - (s.trust[k] || 0)))}${s.charms.includes(k) ? ` · ${CHARMS[k].icon} <b>${CHARMS[k].name}</b> — ${CHARMS[k].text}` : ''}</div>`).join('');
     return `<h3>Сказки на ночь (${s.nightTales.length}/${NIGHT_TOTAL})</h3>${nt}<p class="muted small">Ночью у костра Кот рассказывает новую сказку. Чтобы дождаться ночи, посиди у костра.</p><h3>Доверие и обереги</h3>${tr}<p class="muted small">Перескажи сказ из Книги Коту, Русалке, Кикиморе или Деду. Две верно пересказанные сказки — и друг смастерит оберег.</p>`;
   }
-  return { update, tintSky, night: () => night, fireMenu, applyCharms, hpBonus, bookHtml, hasVoice, setTod: (t) => (tod = t), tod: () => tod, bedtime, NIGHT_TALES };
+  return { update, tintSky, night: () => night, fireMenu, applyCharms, hpBonus, bookHtml, hasVoice, setTod: (t) => (tod = t), tod: () => tod, bedtime, NIGHT_TALES, fb: () => fb };
 }

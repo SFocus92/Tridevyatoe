@@ -172,6 +172,12 @@ const branch = M(new THREE.CylinderGeometry(0.3, 0.5, 5, 7), trunkMat, 2.4, 6.4,
 const branch2 = M(new THREE.CylinderGeometry(0.3, 0.45, 4.5, 7), trunkMat, -2, 7, 1, oak); branch2.rotation.set(0.4, 0, 1.1);
 [[0, 10, 0, 4.2, leafA], [3, 9, 1.5, 3, leafB], [-3, 9.4, -1, 3.2, leafB], [1, 11.8, -2, 2.8, leafA], [-1.5, 10.5, 2.8, 2.6, leafA], [4.5, 8, -1.5, 2.2, leafA]].forEach(([x, y, z, r, mat]) => M(new THREE.IcosahedronGeometry(r, 1), mat, x, y, z, oak));
 colliders.push({ x: 0, z: 0, r: 1.9 }); camBlockers.push(oak);
+// нижние ветви: на правой (к морю) сидит русалка, на левой ночью садится Жар-птица. Они выше кота и героя, и листва их не закрывает
+const lowBranch = (y, ry, len, seatK = 0.72) => { const tl = 0.18, d = (k) => new THREE.Vector3(Math.cos(ry) * Math.cos(tl) * len * k, y + Math.sin(tl) * len * k, -Math.sin(ry) * Math.cos(tl) * len * k);
+  const b = M(new THREE.CylinderGeometry(0.2, 0.42, len, 8), trunkMat, 0, 0, 0, oak); b.position.copy(d(0.5)); b.rotation.set(0, ry, -Math.PI / 2 + tl);
+  const tipLeaf = d(1.05); M(new THREE.IcosahedronGeometry(0.8, 1), leafB, tipLeaf.x, tipLeaf.y + 0.3, tipLeaf.z, oak).scale.set(1, 0.6, 1);
+  return d(seatK).add(new THREE.Vector3(0, 0.3, 0)); };
+const MERMAID_SEAT = lowBranch(3.2, 0.12, 4.8); const FIREBIRD_SEAT = lowBranch(3.7, Math.PI - 0.3, 4.4, 0.8);
 const goldMat = toon(0xffc93a, { emissive: 0x332200 });
 const chainLinks = []; const GAPS = [7, 15, 23];
 for (let i = 0; i < 30; i++) {
@@ -254,8 +260,8 @@ Object.values(heroes).forEach((h) => { h.root.visible = false; scene.add(h.root)
 const ivan = heroes.ivan.root; ivan.visible = true;
 const catPet = pet('pets/cat', 1.25); const cat = catPet.root; scene.add(cat);
 const CAT_HOME = new THREE.Vector3(3.2, H(3.2, 3.2), 3.2); cat.position.copy(CAT_HOME); cat.rotation.y = 0.6;
-const mermaid = makeMermaid(); oak.add(mermaid); mermaid.position.set(4.3, 7.9, 0); mermaid.rotation.y = Math.PI / 2;
-const MERMAID_GROUND = new THREE.Vector3(5.5, H(5.5, 0), 0);
+const mermaid = makeMermaid(); oak.add(mermaid); mermaid.position.copy(MERMAID_SEAT); mermaid.position.y += 0.05; mermaid.rotation.y = 0.75; mermaid.scale.setScalar(1.15);
+const MERMAID_GROUND = new THREE.Vector3(5.2, H(5.2, 1.2), 1.2);
 const kiki = makeKiki(); kiki.position.copy(KIKI_POS); kiki.lookAt(0, KIKI_POS.y, 0); scene.add(kiki);
 colliders.push({ x: KIKI_POS.x, z: KIKI_POS.z, r: 0.8 });
 
@@ -692,7 +698,7 @@ for (let r = -1; r <= 1; r++) for (let c = -2; c <= 2; c++) { if (r === 0 && c =
 const TURNIP3 = GARDEN3.clone();
 const turnip = P('crop_turnip', GARDEN.x, GARDEN.y, 6, 0, -1.6);
 colliders.push({ x: GARDEN.x, z: GARDEN.y, r: 1.2 });
-const dedC = npc('ded'); const ded = dedC.root; ded.position.set(GARDEN.x + 2.6, H(GARDEN.x + 2.6, GARDEN.y - 1.5), GARDEN.y - 1.5); ded.lookAt(0, ded.position.y, 0); scene.add(ded);
+const dedC = npc('ded'); const ded = dedC.root; ded.position.set(GARDEN.x + 2.6, H(GARDEN.x + 2.6, GARDEN.y - 1.5), GARDEN.y - 1.5); ded.rotation.set(0, Math.atan2(-ded.position.x, -ded.position.z), 0); /* только поворот по Y: lookAt давал наклон x=π, и покачивание по z переворачивало Деда под землю */ scene.add(ded);
 colliders.push({ x: ded.position.x, z: ded.position.z, r: 0.5 });
 P('sign', GARDEN.x - 5, GARDEN.y - 4, 3, 0.6);
 const mouse = makeMouse(); const MOUSE3 = new THREE.Vector3(MOUSE.x, H(MOUSE.x, MOUSE.y), MOUSE.y); mouse.position.copy(MOUSE3); scene.add(mouse);
@@ -1220,7 +1226,7 @@ const ctx = {
 };
 
 let EV = null;
-try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
+try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS, FIREBIRD_SEAT: FIREBIRD_SEAT.clone().add(OAK) }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
 // ---------- старт ----------
 function startGame(cont) {
   S.init();
@@ -1246,4 +1252,5 @@ if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont
 camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
 window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S, EV: () => EV, cam: { get yaw() { return camYaw; }, set yaw(v) { camYaw = v; } } };
+if ("serviceWorker" in navigator && location.protocol === "https:") setTimeout(() => navigator.serviceWorker.register("sw.js").catch(() => {}), 3000); // кэш музыки и моделей (только на https, напр. GitHub Pages)
 loop();
