@@ -248,7 +248,7 @@ function makeForgetling() {
 }
 
 const heroes = { ivan: makeChar('ivan'), vasilisa: makeChar('vasilisa'), finist: makeChar('finist') };
-Object.values(heroes).forEach((h) => { h.root.visible = false; });
+Object.values(heroes).forEach((h) => { h.root.visible = false; scene.add(h.root); });
 const ivan = heroes.ivan.root; ivan.visible = true;
 const catPet = pet('pets/cat', 1.25); const cat = catPet.root; scene.add(cat);
 const CAT_HOME = new THREE.Vector3(3.2, H(3.2, 3.2), 3.2); cat.position.copy(CAT_HOME); cat.rotation.y = 0.6;
@@ -306,24 +306,24 @@ ring.rotation.x = -Math.PI / 2; ring.position.set(0, OAK.y + 0.5, 0); scene.add(
 let ringT = -1;
 
 // ---------- состояние ----------
-const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false, turnip: 0, pike: 0, kolobok: 0, feathers: [false, false, false, false, false, false, false], stoneReads: 0 });
+const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false, heroes: ['ivan'], hero: 'ivan', region: 'luk', forest: {}, mount: {}, river: {}, kosh: {}, ending: null, festival: false, turnip: 0, pike: 0, kolobok: 0, feathers: [false, false, false, false, false, false, false], stoneReads: 0 });
 let st = freshState();
 const save = () => localStorage.setItem(SAVE_KEY, JSON.stringify(st));
 const linkCount = () => Object.values(st.links).filter(Boolean).length;
 
-const player = { pos: new THREE.Vector3(10, 0, 13), vy: 0, facing: Math.PI, onGround: true, hp: 5, maxHp: 5, word: 100, attackT: 0, hurtT: 0, buffT: 0, speedT: 0, luckCd: 0, walk: 0, sight: false, locked: false };
+const player = { pos: new THREE.Vector3(10, 0, 13), vy: 0, facing: Math.PI, onGround: true, hp: 5, maxHp: 5, word: 100, attackT: 0, hurtT: 0, buffT: 0, speedT: 0, luckCd: 0, walk: 0, sight: false, locked: false, hero: 'ivan', jumps: 0, dashT: 0, hidden: 0, hiddenModel: false, slow: 0, stepPh: 0, sightCost: 1, cold: 0 };
 let camYaw = 0.6, camPitch = 0.3, camDist = 8, sens = 1;
 
 // враги
 const enemies = [];
 function spawnEnemies() {
-  enemies.forEach((e) => scene.remove(e.g)); enemies.length = 0;
+  removeEnemies('grove');
   if (st.groveCleared) return;
   for (let i = 0; i < 3; i++) {
-    const g = makeForgetling(); scene.add(g);
+    const g = makeForgetling(); (typeof lukGroup !== 'undefined' ? lukGroup : scene).add(g);
     const home = new THREE.Vector3(GROVE.x + Math.cos(i * 2.1) * 3.5, 0, GROVE.y + Math.sin(i * 2.1) * 3.5);
     g.position.set(home.x, H(home.x, home.z) + 1.2, home.z);
-    enemies.push({ g, home, hp: 3, alive: true, cd: 0, kb: new THREE.Vector3(), flash: 0, dying: 0, ph: i * 2 });
+    enemies.push({ g, home, hp: 3, alive: true, cd: 0, kb: new THREE.Vector3(), flash: 0, dying: 0, ph: i * 2, group: 'grove' });
   }
 }
 
@@ -336,7 +336,7 @@ function applyLife(L) {
   tg.attributes.color.needsUpdate = true;
   sun.color.copy(SUN_GRAY).lerp(SUN_LIVE, L); hemi.intensity = 0.8 + 0.4 * L;
   setFlowers(smooth(0.55, 1, L));
-  S.setGray(1 - L);
+  S.setColor(L); uLife.value = L;
 }
 function baseLife() { return st.restored ? 1 : 0.12 + 0.11 * linkCount(); }
 
@@ -354,7 +354,9 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyQ') toggleSight();
   if (e.code === 'KeyF' || e.code === 'KeyE') interact();
   if (e.code === 'KeyJ') attack();
-  if (e.code === 'KeyR') luck();
+  if (e.code === 'KeyR') ability();
+  if (e.code === 'Space') jump();
+  if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') switchHero(['ivan', 'vasilisa', 'finist'][+e.code.slice(5) - 1]);
   if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hidden');
   if (e.code === 'KeyT') teleport();
   if (e.code === 'Space') e.preventDefault();
@@ -369,7 +371,7 @@ canvas.addEventListener('mousedown', (e) => {
 addEventListener('mouseup', (e) => { if (e.button === 2) mouseBlock = false; });
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== canvas) return;
-  camYaw -= e.movementX * 0.0028 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + e.movementY * 0.0022 * sens));
+  camYaw -= e.movementX * 0.0028 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + e.movementY * 0.0022 * sens * (OPT.invY ? -1 : 1)));
 });
 addEventListener('wheel', (e) => { camDist = Math.min(16, Math.max(4, camDist + e.deltaY * 0.01)); });
 
@@ -380,55 +382,104 @@ function toggleSight(force) {
   if (on === player.sight) return;
   player.sight = on; document.body.classList.toggle('sight', on); S.sight(on);
 }
+function hurtEnemy(e, dmg, from) {
+  if (!e.alive) return false;
+  if (e.cond && !e.cond()) { e.flash = 0.1; if (e.immune) ui.toast(e.immune, false, 1400); return false; }
+  const d = e.g.position.clone().sub(from); d.y = 0; d.normalize();
+  e.hp -= dmg; e.flash = 0.2; e.kb.copy(d).multiplyScalar(9 * (e.heavy ? 0.2 : 1));
+  burst(e.g.position, 0xffffff, 12, 3, 0.5, 0.18);
+  if (e.hp <= 0) { e.alive = false; e.dying = 1; S.sleep(); ui.toast((e.name || 'Забудка') + ' уснула 💤'); burst(e.g.position, 0xffe27a, 40, 4, 1.2); e.onDeath && e.onDeath(e); if (e.group === 'grove') checkGrove(); }
+  return true;
+}
+const hittables = []; // {pos(), r, cond(), onHit(hero)} — то, что можно ударить (лёд, сундук…)
+const orbs = [];
 function attack() {
   if (player.attackT > 0 || ui.busy() || player.locked) return;
-  player.attackT = 0.38; S.swing();
+  const hero = player.hero; const H0 = heroes[hero];
+  player.attackT = hero === 'finist' ? 0.26 : 0.38; S.swing();
+  H0.once(hero === 'vasilisa' ? 'interact-right' : 'attack-melee-right', 'idle', hero === 'finist' ? 1.7 : 1.3);
   const fwd = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing));
-  let hitAny = false;
+  if (hero === 'vasilisa') { // волшебный огонёк-клубок: летит к ближайшей цели впереди
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshBasicMaterial({ color: 0x9fe8ff }));
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), new THREE.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false })); m.add(glow);
+    m.position.copy(player.pos).add(new THREE.Vector3(0, 1.4, 0)).addScaledVector(fwd, 0.8); scene.add(m);
+    let tgt = null, best = 18;
+    const consider = (q, extra) => { const d = q.clone().sub(m.position); const L = d.length(); if (L < best + extra && L > 0.5) { const f = d.clone().setY(0).normalize().dot(fwd); if (f > 0.55) { best = L - extra; tgt = q; } } };
+    for (const e of enemies) if (e.alive && e.g.parent?.visible) consider(e.g.position.clone(), 0);
+    for (const h of hittables) if (!h.cond || h.cond()) consider(h.pos(), 2);
+    const v = tgt ? tgt.clone().sub(m.position).normalize().multiplyScalar(18) : fwd.clone().multiplyScalar(18);
+    orbs.push({ m, v, t: 0, tgt }); S.magic(); return;
+  }
+  let hitAny = false; const reach = hero === 'finist' ? 3.2 : 2.8;
   for (const e of enemies) {
-    if (!e.alive) continue;
-    const d = e.g.position.clone().sub(player.pos); d.y = 0;
-    if (d.length() < 2.8 && d.normalize().dot(fwd) > 0.2) {
-      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1);
-      e.hp -= dmg; e.flash = 0.2; e.kb.copy(d).multiplyScalar(9); hitAny = true;
-      burst(e.g.position, 0xffffff, 12, 3, 0.5, 0.18);
-      if (e.hp <= 0) { e.alive = false; e.dying = 1; S.sleep(); ui.toast('Забудка уснула 💤'); burst(e.g.position, 0xffe27a, 40, 4, 1.2); }
+    if (!e.alive || !e.g.parent?.visible) continue;
+    const d = e.g.position.clone().sub(player.pos); const dy = Math.abs(d.y); d.y = 0;
+    if (d.length() < reach + (e.big || 0) && dy < 4 + (e.big || 0) && d.normalize().dot(fwd) > 0.2) {
+      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1) * (hero === 'ivan' ? 1.5 : 1);
+      if (hurtEnemy(e, dmg, player.pos)) hitAny = true;
     }
   }
+  for (const h of hittables) { if (h.cond && !h.cond()) continue; const hp = h.pos(); const d = hp.clone().sub(player.pos); if (Math.hypot(d.x, d.z) < (h.r || 3) + 0.8 && Math.abs(d.y) < (h.ry || 3)) { h.onHit(hero); hitAny = true; } }
   if (hitAny) S.hit();
-  if (player.pos.distanceTo(KIKI_POS) < 3 && !st.links.kiki) { ui.toast('Кикимору силой не взять! Её надо… рассмешить. (F)'); S.laugh(); }
-  if (enemies.length && enemies.every((e) => !e.alive) && !st.groveCleared) {
+  if (region === LUK && player.pos.distanceTo(KIKI_POS) < 3 && !st.links.kiki) { ui.toast('Кикимору силой не взять! Её надо… рассмешить. (F)'); S.laugh(); }
+}
+function checkGrove() {
+  const g = enemies.filter((e) => e.group === 'grove');
+  if (g.length && g.every((e) => !e.alive) && !st.groveCleared) {
     st.groveCleared = true; save();
     setTimeout(() => { ui.toast('Роща притихла… Что-то блеснуло — но глазами не видно.'); }, 900);
   }
 }
 const LUCK = [
   ['Богатырская сила! Урон ×3 на 8 секунд', () => (player.buffT = 8)],
-  ['Апчхи! Иван чихнул — всех вокруг разметало!', () => { enemies.forEach((e) => { if (!e.alive) return; const d = e.g.position.clone().sub(player.pos); d.y = 0; if (d.length() < 9) { e.kb.copy(d.normalize()).multiplyScalar(22); e.hp -= 1; e.flash = 0.3; if (e.hp <= 0) { e.alive = false; e.dying = 1; S.sleep(); } } }); burst(player.pos.clone().setY(player.pos.y + 1.6), 0xffffff, 50, 8, 0.8); }],
+  ['Апчхи! Иван чихнул — всех вокруг разметало!', () => { enemies.forEach((e) => { if (!e.alive || !e.g.parent?.visible) return; const d = e.g.position.clone().sub(player.pos); d.y = 0; if (d.length() < 9) { e.kb.copy(d.normalize()).multiplyScalar(22); hurtEnemy(e, 1, player.pos); } }); burst(player.pos.clone().setY(player.pos.y + 1.6), 0xffffff, 50, 8, 0.8); }],
   ['В кармане нашёлся пряник! +2 ❤', () => (player.hp = Math.min(player.maxHp, player.hp + 2))],
   ['Вороны засмеялись… и всё. Зато весело! 😄', () => {}],
   ['Попутный ветер! Скорость ×1.6 на 8 секунд', () => (player.speedT = 8)],
 ];
-function luck() {
-  if (player.luckCd > 0) { ui.toast('Удача ещё не вернулась.'); return; }
-  const [txt, fn] = LUCK[Math.floor(Math.random() * LUCK.length)]; fn(); player.luckCd = 25;
-  ui.toast('🍀 ' + txt); S.chime();
-  if (enemies.length && enemies.every((e) => !e.alive) && !st.groveCleared) { st.groveCleared = true; save(); }
+function ability() {
+  if (ui.busy() || player.locked) return;
+  if (player.luckCd > 0) { ui.toast(player.hero === 'ivan' ? 'Удача ещё не вернулась.' : 'Сила ещё не вернулась.'); return; }
+  const h = player.hero;
+  if (h === 'ivan') { const [txt, fn] = LUCK[Math.floor(Math.random() * LUCK.length)]; fn(); player.luckCd = 25; ui.toast('🍀 ' + txt); S.chime(); heroes.ivan.once('emote-yes'); }
+  else if (h === 'vasilisa') {
+    player.hp = Math.min(player.maxHp, player.hp + 2); player.word = Math.min(100, player.word + 40); player.luckCd = 30; S.magic(); heroes.vasilisa.once('emote-yes');
+    burst(player.pos.clone().setY(player.pos.y + 1.4), 0x9fe8ff, 40, 4, 1);
+    const [, txt] = objective(); ui.toast('📘 Премудрость: +2 ❤, +Слово. Подсказка: ' + txt, false, 4500);
+  } else if (h === 'finist') { player.dashT = 0.28; player.luckCd = 3.5; S.dash(); burst(player.pos.clone().setY(player.pos.y + 1), 0xffe0a0, 20, 3, 0.5); player.vy = Math.max(player.vy, 3); }
+}
+function heroLabel() {
+  const h = player.hero; const cd = player.luckCd;
+  const nm = h === 'ivan' ? '🍀 R — Удача дурака' : h === 'vasilisa' ? '📘 R — Премудрость' : '🦅 R — рывок · Пробел×2 — полёт';
+  return `${HERO_NAME[h]} · ${cd <= 0 ? nm + ': готово' : nm.replace(/R — /, '') + ': ' + Math.ceil(cd) + ' с'}`;
+}
+function jump() {
+  const p = player; if (ui.busy() || p.locked) return;
+  if (p.onGround) { p.vy = p.hero === 'finist' ? 10 : 9; p.onGround = false; p.jumps = 1; S.jump(); }
+  else if (p.hero === 'finist' && p.jumps < 2) { p.vy = 11; p.jumps = 2; S.dash(); burst(p.pos.clone().setY(p.pos.y + 1), 0xffe0a0, 14, 3, 0.5); }
 }
 function damagePlayer(e) {
   const toE = e.g.position.clone().sub(player.pos); toE.y = 0; toE.normalize();
   const fwd = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing));
   const blocking = keys.has('KeyK') || mouseBlock;
   if (blocking && fwd.dot(toE) > 0.1) { ui.toast('Блок!', false, 800); e.kb.copy(toE).multiplyScalar(12); S.hit(); return; }
-  player.hp -= 1; player.hurtT = 0.4; S.hurt(); e.kb.copy(toE).multiplyScalar(6);
+  e.kb.copy(toE).multiplyScalar(6); hurtPlayer(e.dmg || 1);
+}
+function hurtPlayer(n = 1, why, force = false) {
+  if (player.hurtT > 0 && !force) return; if (player.locked && !force) return;
+  player.hp -= n; player.hurtT = 0.5; S.hurt(); shake(0.25); heroes[player.hero].once('emote-no', 'idle', 2);
+  if (why) ui.toast(why, false, 2200);
   if (player.hp <= 0) fallAsleep();
 }
+let shakeT = 0; const shake = (k = 0.4) => (shakeT = Math.max(shakeT, k));
 async function fallAsleep() {
-  player.locked = true; const fade = document.getElementById('fade'); fade.style.opacity = 1;
-  ui.toast('Иван уснул… Сказки не умирают — они засыпают.', true, 3000);
+  player.locked = true; const fade = document.getElementById('fade'); fade.style.opacity = 1; toggleSight(false);
+  ui.toast(`${HERO_NAME[player.hero]} засыпает… Сказки не умирают — они засыпают.`, true, 3000);
   await wait(1400);
-  player.pos.set(FIRE3.x + 2, FIRE3.y, FIRE3.z + 2.5); player.hp = player.maxHp; player.word = 100; player.luckCd = 0;
-  spawnEnemies(); fade.style.opacity = 0; player.locked = false;
+  if (region === LUK) { player.pos.set(FIRE3.x + 2, FIRE3.y, FIRE3.z + 2.5); spawnEnemies(); }
+  else { const sp = region.spawn(); player.pos.set(sp.x, groundH(sp.x, sp.z), sp.z); region.onSleep && region.onSleep(); }
+  player.hp = player.maxHp; player.word = 100; player.luckCd = 0; player.cold = 0; player.vy = 0;
+  fade.style.opacity = 0; player.locked = false;
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -547,7 +598,11 @@ async function fireTalk() {
 }
 async function portalTalk() {
   if (!st.restored) { await ui.say(IVAN, ['Каменная арка. Внутри — серая муть. Нить Лукоморья порвана, дальше дороги нет.']); return; }
-  await ui.say('Портал', ['Из арки тянет хвоей и дымом. Где-то далеко скрипят куриные ноги избушки…', 'Дремучий лес ждёт. (Продолжение — в следующем срезе: Баба-Яга забыла своё имя.)']);
+  const opts = [['forest', '🌲 Дремучий лес — избушка Бабы-Яги', true], ['mount', '🏔 Ледяные горы — царство Морозко', st.forest.done], ['river', '🌊 Молочные реки — гуси-лебеди', st.mount.done], ['kosh', '💀 Царство Кощея Бессмертного', st.river.done]];
+  const open = opts.filter((o) => o[2] && CHAPTER_READY.has(o[0]));
+  if (!open.length) { await ui.say('Портал', ['Из арки тянет хвоей и дымом. Где-то далеко скрипят куриные ноги избушки…', 'Дорога в Дремучий лес ещё не проложена. (Продолжение — в следующей версии.)']); return; }
+  const c = await ui.dialog('Портал', 'Из арки тянет ветрами всех сказок. Куда шагнуть?', [...open.map((o) => o[1]), 'Остаться в Лукоморье']);
+  if (c >= 0 && c < open.length) await travel(open[c][0]);
 }
 async function restore() {
   player.locked = true; toggleSight(false);
@@ -582,7 +637,7 @@ function outline(root, k = 1.07) {
   const list = []; root.traverse((o) => { if (o.isMesh && !o.userData.isOutline) list.push(o); });
   list.forEach((o) => { o.geometry.computeBoundingSphere(); if (o.geometry.boundingSphere.radius < 0.08) return; const m = new THREE.Mesh(o.geometry, outlineMat); m.userData.isOutline = true; m.scale.setScalar(k); o.add(m); });
 }
-[ivan, cat, mermaid, kiki].forEach((g) => outline(g));
+[mermaid, kiki].forEach((g) => outline(g));
 
 // ---------- новые сказки: персонажи ----------
 function makeMouse() {
@@ -721,11 +776,14 @@ async function pikeTalk() {
 const TP = [['Дуб у Лукоморья', () => new THREE.Vector3(3, 0, 5)], ['Костёр', () => new THREE.Vector3(FIRE.x + 2, 0, FIRE.y + 2.5)], ['Огород деда', () => new THREE.Vector3(GARDEN.x + 3, 0, GARDEN.y - 4)], ['Болото Кикиморы', () => new THREE.Vector3(KIKI_POS.x - 3, 0, KIKI_POS.z + 3)], ['Берёзовая роща', () => new THREE.Vector3(GROVE.x + 5, 0, GROVE.y)], ['Портал', () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4)]];
 async function teleport() {
   if (!st.pike) { ui.toast('Волшебных слов ты пока не знаешь…'); return; }
+  if (ui.busy() || player.locked) return;
   document.exitPointerLock(); player.locked = true;
-  const c = await ui.dialog('По щучьему велению', 'По щучьему велению, по моему хотению — хочу оказаться…', [...TP.map((t) => t[0]), 'Остаться здесь']);
-  if (c >= 0 && c < TP.length) {
+  const list = region === LUK ? TP : [...(region.tp || []), ['Домой, в Лукоморье', null]];
+  const c = await ui.dialog('По щучьему велению', 'По щучьему велению, по моему хотению — хочу оказаться…', [...list.map((t) => t[0]), 'Остаться здесь']);
+  if (c >= 0 && c < list.length) {
+    if (!list[c][1]) { player.locked = false; await travel('luk', new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4)); return; }
     const fade = document.getElementById('fade'); fade.style.opacity = 1; S.chime(); await wait(700);
-    player.pos.copy(TP[c][1]()); player.pos.y = H(player.pos.x, player.pos.z); camera.position.copy(player.pos).add(new THREE.Vector3(0, 4, 8));
+    player.pos.copy(list[c][1]()); player.pos.y = groundH(player.pos.x, player.pos.z); player.vy = 0; camera.position.copy(player.pos).add(new THREE.Vector3(0, 4, 8));
     fade.style.opacity = 0;
   }
   player.locked = false;
@@ -742,7 +800,8 @@ async function koloCatch() {
   }
   player.locked = false;
 }
-function objective() {
+function objective() { return region === LUK ? lukObjective() : region.objective(); }
+function lukObjective() {
   if (st.stage === 0) return [cat.position, 'к коту учёному у дуба'];
   if (st.stage === 1) {
     if (!st.links.mermaid) return [MERMAID_GROUND, 'к русалке на ветвях дуба — у неё загадки'];
@@ -756,7 +815,11 @@ function objective() {
   if (!st.pike) return [PIKE3, 'на берег — там кто-то бьётся на песке'];
   const f = FEATHERS.find((f) => !st.feathers[f.i]);
   if (f) return [f.g.position, 'к перу Жар-птицы' + (f.hidden ? ' (оно видно только взглядом)' : '')];
-  return [PORTAL3, 'к порталу в Дремучий лес'];
+  if (!st.forest.done) return [PORTAL3, 'к порталу в Дремучий лес'];
+  if (!st.mount.done) return [PORTAL3, 'через портал — в Ледяные горы'];
+  if (!st.river.done) return [PORTAL3, 'через портал — к Молочным рекам'];
+  if (!st.kosh.done) return [PORTAL3, 'через портал — в царство Кощея'];
+  return [cat.position, 'к коту — сказка рассказана! Послушай его'];
 }
 async function koloTalk() { const [, txt] = objective(); await ui.say(KOLO, [`Покатили ${txt}! Я впереди.`]); }
 function collectFeather(f) {
@@ -776,17 +839,25 @@ function collectFeather(f) {
 // ---------- миникарта ----------
 const mm = document.getElementById('minimap'), mctx = mm.getContext('2d');
 function drawMinimap() {
-  const W = mm.width, c = W / 2, k = (W / 2 - 6) / 56; const X = (x) => c + x * k, Z = (z) => c + z * k;
+  const R = region; const W = mm.width, c = W / 2, k = (W / 2 - 6) / (R === LUK ? 56 : R.radius + 4);
+  const X = (x) => c + (x - R.center.x) * k, Z = (z) => c + (z - R.center.y) * k;
   mctx.clearRect(0, 0, W, W);
   const g = (a, b) => { const t = life; return `rgb(${Math.round(a[0] + (b[0] - a[0]) * t)},${Math.round(a[1] + (b[1] - a[1]) * t)},${Math.round(a[2] + (b[2] - a[2]) * t)})`; };
-  mctx.fillStyle = g([120, 128, 138], [60, 140, 210]); mctx.beginPath(); mctx.arc(c, c, W / 2, 0, 7); mctx.fill();
-  mctx.fillStyle = g([190, 185, 170], [240, 214, 150]); mctx.beginPath(); mctx.arc(c, c, 54 * k, 0, 7); mctx.fill();
-  mctx.fillStyle = g([150, 156, 150], [100, 180, 80]); mctx.beginPath(); mctx.arc(c, c, 47 * k, 0, 7); mctx.fill();
-  mctx.fillStyle = g([110, 115, 110], [70, 95, 60]); mctx.beginPath(); mctx.arc(X(SWAMP.x), Z(SWAMP.y), 9 * k, 0, 7); mctx.fill();
   mctx.font = '13px serif'; mctx.textAlign = 'center'; mctx.textBaseline = 'middle';
-  [['🌳', 0, 0], ['🔥', FIRE.x, FIRE.y], ['🌀', PORTAL.x, PORTAL.y], ['🪨', STONE.x, STONE.y], ['🥕', GARDEN.x, GARDEN.y], ['🐸', KIKI_POS.x, KIKI_POS.z]].forEach(([e, x, z]) => mctx.fillText(e, X(x), Z(z)));
+  if (R === LUK) {
+    mctx.fillStyle = g([120, 128, 138], [60, 140, 210]); mctx.beginPath(); mctx.arc(c, c, W / 2, 0, 7); mctx.fill();
+    mctx.fillStyle = g([190, 185, 170], [240, 214, 150]); mctx.beginPath(); mctx.arc(c, c, 54 * k, 0, 7); mctx.fill();
+    mctx.fillStyle = g([150, 156, 150], [100, 180, 80]); mctx.beginPath(); mctx.arc(c, c, 47 * k, 0, 7); mctx.fill();
+    mctx.fillStyle = g([110, 115, 110], [70, 95, 60]); mctx.beginPath(); mctx.arc(X(SWAMP.x), Z(SWAMP.y), 9 * k, 0, 7); mctx.fill();
+    [['🌳', 0, 0], ['🔥', FIRE.x, FIRE.y], ['🌀', PORTAL.x, PORTAL.y], ['🪨', STONE.x, STONE.y], ['🥕', GARDEN.x, GARDEN.y], ['🐸', KIKI_POS.x, KIKI_POS.z]].forEach(([e, x, z]) => mctx.fillText(e, X(x), Z(z)));
+  } else {
+    const mmc = R.mm || {}; mctx.fillStyle = g([110, 115, 120], mmc.bg || [40, 70, 50]); mctx.beginPath(); mctx.arc(c, c, W / 2, 0, 7); mctx.fill();
+    mctx.fillStyle = g([150, 154, 150], mmc.land || [90, 150, 80]); mctx.beginPath(); mctx.arc(c, c, R.radius * k, 0, 7); mctx.fill();
+    R.mmDraw && R.mmDraw(mctx, X, Z, k, g);
+    (R.icons ? R.icons() : []).forEach(([e, x, z]) => mctx.fillText(e, X(x), Z(z)));
+  }
   const [op] = objective(); const pulse = 3 + Math.sin(T * 5) * 1.5;
-  mctx.fillStyle = '#ffd23f'; mctx.beginPath(); mctx.arc(X(op.x), Z(op.z), pulse, 0, 7); mctx.fill();
+  if (op) { mctx.fillStyle = '#ffd23f'; mctx.beginPath(); mctx.arc(X(op.x), Z(op.z), pulse, 0, 7); mctx.fill(); }
   mctx.save(); mctx.translate(X(player.pos.x), Z(player.pos.z)); mctx.rotate(-player.facing + Math.PI);
   mctx.fillStyle = '#d63a2f'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 1.5; mctx.beginPath(); mctx.moveTo(0, -7); mctx.lineTo(5, 5); mctx.lineTo(-5, 5); mctx.closePath(); mctx.fill(); mctx.stroke(); mctx.restore();
 }
@@ -827,22 +898,38 @@ function updateTales(dt, canMove) {
   });
   // дед покачивается
   ded.rotation.z = Math.sin(T * 1.3) * 0.03;
-  if (started && (Math.floor(T * 10) % 2 === 0)) drawMinimap();
 }
 
 // ---------- настройки и сенсорное управление ----------
 const settingsEl = document.getElementById('settings');
+const OPT = Object.assign({ master: 0.7, music: 0.6, sfx: 0.8, sens: 1, invY: false, help: true, quality: 'medium', shake: true }, (() => { try { return JSON.parse(localStorage.getItem('tri_opts') || '{}'); } catch { return {}; } })());
+const saveOpt = () => localStorage.setItem('tri_opts', JSON.stringify(OPT));
+function applyQuality() {
+  const q = OPT.quality; renderer.setPixelRatio(q === 'low' ? Math.min(devicePixelRatio, 1) * 0.75 : q === 'high' ? Math.min(devicePixelRatio, 2) : Math.min(devicePixelRatio, 1.5));
+  renderer.shadowMap.enabled = q !== 'low'; sun.castShadow = q !== 'low';
+  const ms = q === 'high' ? 2048 : 1024; if (sun.shadow.mapSize.x !== ms) { sun.shadow.mapSize.set(ms, ms); sun.shadow.map?.dispose(); sun.shadow.map = null; }
+  scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.needsUpdate = true)); });
+  renderer.setSize(innerWidth, innerHeight);
+}
+function applyOpt() {
+  sens = OPT.sens; S.vol.master = OPT.master; S.vol.music = OPT.music; S.vol.sfx = OPT.sfx; S.applyVolumes();
+  document.getElementById('help').classList.toggle('hidden', !OPT.help || isTouch);
+}
 function toggleSettings(open) { settingsEl.classList.toggle('hidden', !open); ui.bookOpen = open; if (open) document.exitPointerLock(); }
 document.getElementById('btnGear').onclick = () => toggleSettings(true);
 document.getElementById('optClose').onclick = () => toggleSettings(false);
 document.getElementById('optReset').onclick = () => { if (confirm('Начать сказку заново? Прогресс сотрётся.')) { localStorage.removeItem(SAVE_KEY); location.reload(); } };
-document.getElementById('optVol').oninput = (e) => { if (S.master) S.master.gain.value = +e.target.value; localStorage.setItem('tri_vol', e.target.value); };
-document.getElementById('optSens').oninput = (e) => { sens = +e.target.value; localStorage.setItem('tri_sens', e.target.value); };
-document.getElementById('optHelp').onchange = (e) => document.getElementById('help').classList.toggle('hidden', !e.target.checked);
-if (localStorage.getItem('tri_sens')) { sens = +localStorage.getItem('tri_sens'); document.getElementById('optSens').value = sens; }
-if (localStorage.getItem('tri_vol')) document.getElementById('optVol').value = localStorage.getItem('tri_vol');
+document.getElementById('optFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); };
+for (const [id, key] of [['optMaster', 'master'], ['optMusic', 'music'], ['optSfx', 'sfx'], ['optSens', 'sens']]) {
+  const el = document.getElementById(id); el.value = OPT[key]; el.oninput = () => { OPT[key] = +el.value; saveOpt(); applyOpt(); if (key === 'sfx') S.click(); };
+}
+for (const [id, key] of [['optInvY', 'invY'], ['optHelp', 'help'], ['optShake', 'shake']]) {
+  const el = document.getElementById(id); el.checked = OPT[key]; el.onchange = () => { OPT[key] = el.checked; saveOpt(); applyOpt(); };
+}
+{ const el = document.getElementById('optQuality'); el.value = OPT.quality; el.onchange = () => { OPT.quality = el.value; saveOpt(); applyQuality(); }; }
 const joy = { x: 0, y: 0, id: null };
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+applyQuality(); applyOpt();
 if (isTouch) {
   document.getElementById('touch').classList.remove('hidden'); document.getElementById('help').classList.add('hidden');
   const jz = document.getElementById('joy'), knob = document.getElementById('joyKnob');
@@ -851,26 +938,32 @@ if (isTouch) {
   jz.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joy.id) setJ(t); }, { passive: false });
   const endJ = (e) => { for (const t of e.changedTouches) if (t.identifier === joy.id) { joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; } };
   jz.addEventListener('touchend', endJ); jz.addEventListener('touchcancel', endJ);
-  const acts = { attack: () => attack(), interact: () => (ui.dialogOpen ? ui._advance() : interact()), sight: () => toggleSight(), jump: () => { if (player.onGround) { player.vy = 9; player.onGround = false; } }, luck: () => luck(), book: () => ui.book(st, !ui.bookOpen) };
-  document.querySelectorAll('#tbtns button').forEach((b) => b.addEventListener('touchstart', (e) => { e.preventDefault(); if (!started) return; if (b.dataset.a !== 'book' && b.dataset.a !== 'interact' && (ui.busy() || player.locked)) return; acts[b.dataset.a](); }, { passive: false }));
+  const acts = { attack: () => attack(), interact: () => (ui.dialogOpen ? ui._advance() : interact()), sight: () => toggleSight(), jump: () => jump(), luck: () => ability(), book: () => ui.book(st, !ui.bookOpen),
+    hero: () => { const hs = st.heroes; switchHero(hs[(hs.indexOf(player.hero) + 1) % hs.length]); }, tp: () => teleport(), block: () => {} };
+  document.querySelectorAll('#tbtns button').forEach((b) => {
+    b.addEventListener('touchstart', (e) => { e.preventDefault(); if (!started) return; if (b.dataset.a === 'block') { mouseBlock = true; return; } if (b.dataset.a === 'jump') keys.add('Space'); if (b.dataset.a !== 'book' && b.dataset.a !== 'interact' && (ui.busy() || player.locked)) return; acts[b.dataset.a](); }, { passive: false });
+    b.addEventListener('touchend', () => { if (b.dataset.a === 'block') mouseBlock = false; if (b.dataset.a === 'jump') keys.delete('Space'); });
+  });
   let camT = null;
   canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; camT = { id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
-  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens)); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens * (OPT.invY ? -1 : 1))); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
 }
 
 // ---------- трекер ----------
+const BOOK_TOTAL = 13, WORDS_TOTAL = 7; ui.totals = { book: BOOK_TOTAL, words: WORDS_TOTAL };
 function trackerHtml() {
+  if (region !== LUK) return region.tracker() + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
   const ck = (b) => (b ? '☑' : '☐');
   let h;
   if (st.stage === 0) h = '<b>📜 Пробуждение</b><br>• Поговори с Котом учёным у дуба (F)';
   else if (st.stage === 1) h = `<b>📜 Цепь златая</b><br>${ck(st.links.mermaid)} Звено русалки — загадки (${st.riddle}/3)<br>${ck(st.links.grove)} Звено берёзовой рощи${st.groveCleared ? '' : ' — забудки'}<br>${ck(st.links.kiki)} Звено Кикиморы — болото<br><i style="opacity:.8">Q — увидеть Нити Сказа</i>`;
   else if (st.stage === 2) h = '<b>📜 Цепь златая</b><br>• Скрепи цепь у дуба (F у ствола)';
-  else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>• Портал в Дремучий лес проснулся`;
+  else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>• Портал проснулся — шагни в него`;
   if (st.stage >= 1) {
     const nf = st.feathers.filter(Boolean).length;
     h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7`;
   }
-  return h + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/5 · Слова: ${st.words.length}/5</span>`;
+  return h + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
 }
 
 // ---------- цикл ----------
@@ -878,106 +971,135 @@ const clock = new THREE.Clock(); let T = 0; let started = false;
 const tmpV = new THREE.Vector3(); const ray = new THREE.Raycaster();
 function update(dt) {
   T += dt;
+  const Rg = region; const inLuk = Rg === LUK;
   // жизнь мира
+  lifeTarget = lifeOverride ?? (inLuk ? baseLife() : Rg.life());
   if (Math.abs(life - lifeTarget) > 0.002) { life += Math.sign(lifeTarget - life) * Math.min(Math.abs(lifeTarget - life), dt * (lifeTarget === 1 ? 0.28 : 0.4)); }
   if (Math.abs(life - lifeShown) > 0.004) { applyLife(life); lifeShown = life; }
-  const sk = Math.min(1, dt * 4);
-  const top = SKY.topGray.clone().lerp(SKY.topLive, life), bot = SKY.botGray.clone().lerp(SKY.botLive, life);
-  if (player.sight) { top.lerp(SKY.topSight, 0.6); bot.lerp(SKY.botSight, 0.5); }
+  const SK0 = Rg.sky || SKY; const sk = Math.min(1, dt * 4);
+  const top = SK0.topGray.clone().lerp(SK0.topLive, life), bot = SK0.botGray.clone().lerp(SK0.botLive, life);
+  if (player.sight) { top.lerp(SK0.topSight, 0.6); bot.lerp(SK0.botSight, 0.5); }
   skyMat.uniforms.top.value.lerp(top, sk); skyMat.uniforms.bottom.value.lerp(bot, sk);
   scene.background.copy(skyMat.uniforms.bottom.value); scene.fog.color.copy(scene.background);
   skyDome.position.copy(camera.position);
-  clouds.forEach((c) => { c.position.x += dt * c.userData.sp; if (c.position.x > 130) c.position.x = -130; });
+  if (inLuk) clouds.forEach((c) => { c.position.x += dt * c.userData.sp; if (c.position.x > 130) c.position.x = -130; });
 
   // игрок
   const p = player; const canMove = started && !ui.busy() && !p.locked;
+  const hero = heroes[p.hero];
+  const blocking = (keys.has('KeyK') || mouseBlock) && canMove;
+  let moving = false, speed = 0;
   if (canMove) {
     if (keys.has('ArrowLeft')) camYaw += dt * 2; if (keys.has('ArrowRight')) camYaw -= dt * 2;
     let ix = 0, iz = 0;
-    if (keys.has('KeyW')) iz -= 1; if (keys.has('KeyS')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) iz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
     if (joy.id !== null) { ix += joy.x; iz += joy.y; }
-    const blocking = keys.has('KeyK') || mouseBlock;
-    let speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.85 ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1);
-    if (ix || iz) {
-      const l = Math.hypot(ix, iz); ix /= l; iz /= l;
-      const sx = Math.sin(camYaw), cz = Math.cos(camYaw);
-      const dx = ix * cz + iz * sx, dz = -ix * sx + iz * cz;
-      p.pos.x += dx * speed * dt; p.pos.z += dz * speed * dt;
+    const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.85;
+    speed = (run ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1) * (p.hero === 'finist' ? 1.08 : 1) * (p.slow > 0 ? 0.6 : 1);
+    if (p.dashT > 0) speed = 26;
+    if (ix || iz || p.dashT > 0) {
+      let dx, dz;
+      if (ix || iz) { const l = Math.hypot(ix, iz); ix /= l; iz /= l; const sx = Math.sin(camYaw), cz = Math.cos(camYaw); dx = ix * cz + iz * sx; dz = -ix * sx + iz * cz; }
+      else { dx = Math.sin(p.facing); dz = Math.cos(p.facing); }
+      p.pos.x += dx * speed * dt; p.pos.z += dz * speed * dt; moving = true;
       const tf = Math.atan2(dx, dz); let df = tf - p.facing; df = Math.atan2(Math.sin(df), Math.cos(df)); p.facing += df * Math.min(1, dt * 12);
       p.walk += dt * speed * 1.6;
     } else p.walk *= 0.85;
-    if (keys.has('Space') && p.onGround) { p.vy = 9; p.onGround = false; }
   }
-  for (const c of colliders) { const dx = p.pos.x - c.x, dz = p.pos.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.4; if (d < m && d > 0.0001) { p.pos.x = c.x + (dx / d) * m; p.pos.z = c.z + (dz / d) * m; } }
-  const r = Math.hypot(p.pos.x, p.pos.z); if (r > 52) { p.pos.x *= 52 / r; p.pos.z *= 52 / r; }
-  const gh = Math.max(H(p.pos.x, p.pos.z), 0.05);
-  p.vy -= 26 * dt; p.pos.y += p.vy * dt; if (p.pos.y <= gh) { p.pos.y = gh; p.vy = 0; p.onGround = true; }
+  for (const c of colliders) { if (Math.abs(p.pos.x - c.x) > 6 || Math.abs(p.pos.z - c.z) > 6) continue; if (c.h !== undefined && p.pos.y > c.h) continue; const dx = p.pos.x - c.x, dz = p.pos.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.4; if (d < m && d > 0.0001) { p.pos.x = c.x + (dx / d) * m; p.pos.z = c.z + (dz / d) * m; } }
+  { const cx = p.pos.x - Rg.center.x, cz = p.pos.z - Rg.center.y, r = Math.hypot(cx, cz); if (r > Rg.radius) { p.pos.x = Rg.center.x + (cx * Rg.radius) / r; p.pos.z = Rg.center.y + (cz * Rg.radius) / r; } }
+  const gh = Math.max(groundH(p.pos.x, p.pos.z), Rg.water === false ? -99 : 0.05);
+  const gliding = p.hero === 'finist' && !p.onGround && keys.has('Space') && p.vy < 0 && canMove;
+  p.vy -= (gliding ? 6 : 26) * dt; if (gliding) p.vy = Math.max(p.vy, -2.2);
+  p.pos.y += p.vy * dt;
+  if (p.pos.y <= gh) { if (!p.onGround && p.vy < -8) { S.land(); burst(p.pos.clone(), 0xd8d0c0, 8, 2, 0.4, 0.15); } p.pos.y = gh; p.vy = 0; p.onGround = true; p.jumps = 0; } else if (p.pos.y > gh + 0.05) p.onGround = false;
+  if (gliding && Math.random() < dt * 20) burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffe0a0, 1, 0.5, 0.6, 0.12);
   p.attackT = Math.max(0, p.attackT - dt); p.hurtT = Math.max(0, p.hurtT - dt); p.buffT = Math.max(0, p.buffT - dt); p.speedT = Math.max(0, p.speedT - dt); p.luckCd = Math.max(0, p.luckCd - dt);
-  if (p.sight) { p.word -= dt * 9; if (p.word <= 0) { p.word = 0; toggleSight(false); ui.toast('Слово иссякло. Отдохни у костра.'); } }
+  p.dashT = Math.max(0, p.dashT - dt); p.hidden = Math.max(0, p.hidden - dt); p.slow = Math.max(0, p.slow - dt);
+  if (p.sight) { p.word -= dt * 9 * p.sightCost; if (p.word <= 0) { p.word = 0; toggleSight(false); ui.toast('Слово иссякло. Отдохни у костра.'); } }
   else p.word = Math.min(100, p.word + dt * (st.feathers.every(Boolean) ? 6 : 2.5));
-  if (p.pos.distanceTo(FIRE3) < 4) { p.word = Math.min(100, p.word + dt * 30); if (T % 1.5 < dt) p.hp = Math.min(p.maxHp, p.hp + 1); }
+  if (inLuk && p.pos.distanceTo(FIRE3) < 4) { p.word = Math.min(100, p.word + dt * 30); if (T % 1.5 < dt) p.hp = Math.min(p.maxHp, p.hp + 1); }
+  // шаги
+  if (moving && p.onGround) { p.stepPh += dt * speed * 0.42; if (p.stepPh > 1) { p.stepPh = 0; S.step(Rg.surface ? Rg.surface(p.pos.x, p.pos.z) : inLuk ? lukSurface(p.pos.x, p.pos.z) : 'grass'); } }
 
-  ivan.position.copy(p.pos); ivan.rotation.y = p.facing;
-  const u = ivan.userData; const sw = Math.sin(p.walk) * 0.7 * Math.min(1, p.walk);
-  u.legL.rotation.x = sw; u.legR.rotation.x = -sw; u.armL.rotation.x = -sw * 0.8;
-  u.armR.rotation.x = p.attackT > 0 ? -Math.PI / 2 * Math.sin((p.attackT / 0.38) * Math.PI) - 0.3 : (keys.has('KeyK') || mouseBlock) ? -1.3 : sw * 0.8;
-  ivan.scale.setScalar(p.buffT > 0 ? 1.15 : 1);
+  // герой: позиция и анимация
+  const hr = hero.root; hr.position.copy(p.pos); hr.rotation.y = p.facing; hr.scale.setScalar(p.buffT > 0 ? 1.15 : 1);
+  hr.visible = !(p.hidden > 0 && p.hiddenModel);
+  if (!hero._busy) hero.play(!p.onGround ? (gliding ? 'holding-both' : 'sprint') : blocking ? 'holding-both' : moving ? (speed > 8 ? 'sprint' : 'walk') : 'idle');
+  const anim = hero.cur; if (anim) anim.timeScale = !p.onGround && !gliding ? 0.4 : moving ? Math.max(0.8, speed / 7) : 1;
+  if (hr.userData.wings) { const w = hr.userData.wings; w.visible = gliding || p.dashT > 0 || (!p.onGround && p.jumps >= 2); w.children.forEach((c) => (c.rotation.z = c.userData.s * (gliding ? Math.sin(T * 3) * 0.12 : Math.sin(T * 18) * 0.5))); }
+  if (hr.userData.braid) hr.userData.braid.rotation.x = moving ? 0.25 + Math.sin(T * 10) * 0.08 : 0.05;
+  hero.update(dt);
+  for (const c of chars) if (c.root.parent && c.root.parent.visible !== false && c.root.visible) c.update(dt);
+  for (const m of mixers) { const r = m.getRoot(); if (r.parent && r.parent.parent?.visible !== false) m.update(dt); }
   document.getElementById('hurtFx').style.opacity = p.hurtT > 0 ? 1 : 0;
 
   // враги
   for (const e of enemies) {
-    if (e.dying > 0) { e.dying -= dt; e.g.scale.setScalar(Math.max(0.01, e.dying)); e.g.position.y += dt; if (e.dying <= 0) e.g.visible = false; continue; }
-    if (!e.alive) continue;
+    if (e.dying > 0) { e.dying -= dt; e.g.scale.setScalar(Math.max(0.01, e.dying) * (e.scale || 1)); e.g.position.y += dt; if (e.dying <= 0) e.g.visible = false; continue; }
+    if (!e.alive || !e.g.parent?.visible) continue;
     const d = p.pos.clone().sub(e.g.position); d.y = 0; const dist = d.length();
-    const aggro = dist < 13 && canMove;
+    const aggro = !e.passive && dist < (e.aggroR || 13) && canMove && !(p.hidden > 0);
     const target = aggro ? p.pos : e.home;
     const to = new THREE.Vector3(target.x - e.g.position.x, 0, target.z - e.g.position.z);
-    if (to.length() > (aggro ? 1.1 : 0.5)) { to.normalize().multiplyScalar((aggro ? 3.4 : 1.5) * dt); e.g.position.add(to); }
+    if (!e.still && to.length() > (aggro ? (e.reach || 1.1) : 0.5)) { to.normalize().multiplyScalar((aggro ? (e.speed || 3.4) : 1.5) * dt); e.g.position.add(to); }
     e.g.position.addScaledVector(e.kb, dt); e.kb.multiplyScalar(Math.pow(0.02, dt));
-    e.g.position.y = H(e.g.position.x, e.g.position.z) + 1.3 + Math.sin(T * 2 + e.ph) * 0.25;
+    e.g.position.y = groundH(e.g.position.x, e.g.position.z) + (e.fly ?? 1.3) + Math.sin(T * 2 + e.ph) * 0.25;
     e.g.lookAt(p.pos.x, e.g.position.y, p.pos.z);
-    e.cd -= dt; if (aggro && dist < 1.4 && e.cd <= 0) { e.cd = 1.3; damagePlayer(e); }
-    e.flash -= dt;
+    e.cd -= dt; if (aggro && dist < (e.reach || 1.1) + 0.4 && e.cd <= 0) { e.cd = e.rate || 1.3; damagePlayer(e); }
+    e.flash -= dt; e.custom && e.custom(e, dt);
     const m = e.g.userData.mat;
-    m.emissive.setHex(e.flash > 0 ? 0xffffff : p.sight ? 0x806010 : 0x000000);
+    if (m && m.emissive) m.emissive.setHex(e.flash > 0 ? 0xffffff : p.sight ? 0x806010 : e.glow || 0x000000);
   }
-
-  // нити и тайники
-  for (const k in threads) { const th = threads[k]; th.g.visible = p.sight && st.stage >= 1 && !st.links[k]; th.glow.material.opacity = 0.18 + 0.12 * Math.sin(T * 4); }
-  GROVE_LINK.visible = st.groveCleared && !st.links.grove && p.sight;
-  GROVE_LINK.rotation.y += dt * 2;
-  if (st.groveCleared && !st.links.grove && !p.sight && !st.seenGroveHint && Math.hypot(p.pos.x - GROVE.x, p.pos.z - GROVE.y) < 5) { st.seenGroveHint = true; ui.toast('Здесь что-то есть… Попробуй Сказительский взгляд (Q).'); }
-
-  // мир
-  const sp = seaGeo.attributes.position; for (let i = 0; i < sp.count; i++) { const x = seaBaseY[i * 3], z = seaBaseY[i * 3 + 2]; sp.setY(i, Math.sin(x * 0.12 + T * 1.3) * 0.15 + Math.cos(z * 0.1 + T) * 0.15); }
+  // огоньки Василисы
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i]; o.t += dt;
+    if (o.tgt) o.v.lerp(o.tgt.clone().sub(o.m.position).normalize().multiplyScalar(18), Math.min(1, dt * 6));
+    o.m.position.addScaledVector(o.v, dt); o.m.scale.setScalar(1 + Math.sin(o.t * 30) * 0.1);
+    if (Math.random() < dt * 30) burst(o.m.position.clone(), 0x9fe8ff, 1, 0.5, 0.4, 0.12);
+    let hit = o.t > 1.2;
+    for (const e of enemies) { if (!e.alive || hit || !e.g.parent?.visible) continue; if (e.g.position.distanceTo(o.m.position) < 1.3 + (e.big || 0)) { hurtEnemy(e, 1.5 * (p.sight ? 2 : 1), o.m.position.clone().sub(o.v)); S.hit(); hit = true; } }
+    for (const h of hittables) { if (hit || (h.cond && !h.cond())) continue; const hp = h.pos(); if (hp.distanceTo(o.m.position) < (h.r || 3)) { h.onHit('vasilisa'); hit = true; } }
+    if (hit) { burst(o.m.position, 0x9fe8ff, 16, 3, 0.5, 0.2); scene.remove(o.m); orbs.splice(i, 1); }
+  }
+  // море следует за игроком
+  sea.position.x = Math.round(p.pos.x / 10) * 10; sea.position.z = Math.round(p.pos.z / 10) * 10;
+  const sp = seaGeo.attributes.position; for (let i = 0; i < sp.count; i++) { const x = seaBaseY[i * 3] + sea.position.x, z = seaBaseY[i * 3 + 2] + sea.position.z; sp.setY(i, Math.sin(x * 0.12 + T * 1.3) * 0.15 + Math.cos(z * 0.1 + T) * 0.15); }
   sp.needsUpdate = true;
-  flame.scale.set(1 + Math.sin(T * 13) * 0.08, 1 + Math.sin(T * 9) * 0.15, 1); flame2.scale.y = 1 + Math.sin(T * 17) * 0.2;
-  fireLight.intensity = 16 + Math.sin(T * 11) * 3 + Math.sin(T * 7.3) * 2;
-  if (Math.random() < dt * 4) burst(FIRE3.clone().setY(FIRE3.y + 1.2), 0xffa040, 3, 1.2, 1, 0.12);
-  portalDisc.rotation.z += dt; swirl.rotation.z -= dt * 2;
-  if (st.restored) { portalMat.color.lerp(new THREE.Color(0x2f9e5a), dt); portalMat.opacity = Math.min(0.75, portalMat.opacity + dt * 0.3); swirl.material.opacity = Math.min(0.9, swirl.material.opacity + dt * 0.3); }
-  mermaid.userData.tail.rotation.x = Math.sin(T * 1.6) * 0.25;
-  kiki.position.y = KIKI_POS.y + Math.sin(T * 1.2) * 0.05; if (kiki.userData.giggle > 0) { kiki.userData.giggle -= dt; kiki.rotation.z = Math.sin(T * 30) * 0.08; } else kiki.rotation.z = 0;
-  if (st.restored && !ui.dialogOpen) {
-    const a = T * 0.35; const rr = 2.7; cat.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); cat.position.y = H(cat.position.x, cat.position.z); cat.rotation.y = -a; catPet.play('walk');
-  } else { if (!st.restored) cat.position.copy(CAT_HOME); catPet.play(ui.dialogOpen && p.pos.distanceTo(cat.position) < 4 ? 'gesture-positive' : 'idle'); }
-  if (ui.dialogOpen) { const d = p.pos.clone().sub(cat.position); if (d.length() < 4) cat.rotation.y = Math.atan2(d.x, d.z); }
-  chainLinks.forEach((l, i) => (l.material.emissive.setHex(st.restored ? 0x553300 : 0x221100)));
 
-  // бабочки
-  const bk = smooth(0.8, 1, life);
-  butterflies.forEach((b) => { b.g.visible = bk > 0.01; if (!b.g.visible) return; const t = T * 0.6 + b.ph; b.g.position.set(b.home.x + Math.sin(t) * 3, H(b.home.x, b.home.z) + 1.2 + Math.sin(t * 2.3) * 0.6, b.home.z + Math.cos(t * 0.8) * 3); b.g.rotation.y = t; const fl = Math.sin(T * 18 + b.ph) * 0.9; b.p1.rotation.y = fl; b.p2.rotation.y = -fl; b.g.scale.setScalar(bk); });
-
-  // частицы, кольцо
+  // частицы
   for (let i = bursts.length - 1; i >= 0; i--) {
     const bs = bursts[i]; bs.t += dt; const arr = bs.pts.geometry.attributes.position.array;
     bs.v.forEach((v, j) => { v.y -= 2.5 * dt; arr[j * 3] += v.x * dt; arr[j * 3 + 1] += v.y * dt; arr[j * 3 + 2] += v.z * dt; });
     bs.pts.geometry.attributes.position.needsUpdate = true; bs.pts.material.opacity = 1 - bs.t / bs.life;
     if (bs.t >= bs.life) { scene.remove(bs.pts); bs.pts.geometry.dispose(); bs.pts.material.dispose(); bursts.splice(i, 1); }
   }
-  if (ringT >= 0) { ringT += dt; const s = ringT * 28; ring.scale.setScalar(s); ring.material.opacity = Math.max(0, 0.8 - ringT * 0.27); if (ringT > 3) ringT = -1; }
 
-  updateTales(dt, canMove);
+  if (inLuk) {
+    // нити и тайники
+    for (const k in threads) { const th = threads[k]; th.g.visible = p.sight && st.stage >= 1 && !st.links[k]; th.glow.material.opacity = 0.18 + 0.12 * Math.sin(T * 4); }
+    GROVE_LINK.visible = st.groveCleared && !st.links.grove && p.sight;
+    GROVE_LINK.rotation.y += dt * 2;
+    if (st.groveCleared && !st.links.grove && !p.sight && !st.seenGroveHint && Math.hypot(p.pos.x - GROVE.x, p.pos.z - GROVE.y) < 5) { st.seenGroveHint = true; ui.toast('Здесь что-то есть… Попробуй Сказительский взгляд (Q).'); }
+    flame.scale.set(1 + Math.sin(T * 13) * 0.08, 1 + Math.sin(T * 9) * 0.15, 1); flame2.scale.y = 1 + Math.sin(T * 17) * 0.2;
+    fireLight.intensity = 16 + Math.sin(T * 11) * 3 + Math.sin(T * 7.3) * 2;
+    if (Math.random() < dt * 4) burst(FIRE3.clone().setY(FIRE3.y + 1.2), 0xffa040, 3, 1.2, 1, 0.12);
+    portalDisc.rotation.z += dt; swirl.rotation.z -= dt * 2;
+    if (st.restored) { portalMat.color.lerp(new THREE.Color(0x2f9e5a), dt); portalMat.opacity = Math.min(0.75, portalMat.opacity + dt * 0.3); swirl.material.opacity = Math.min(0.9, swirl.material.opacity + dt * 0.3); }
+    mermaid.userData.tail.rotation.x = Math.sin(T * 1.6) * 0.25;
+    kiki.position.y = KIKI_POS.y + Math.sin(T * 1.2) * 0.05; if (kiki.userData.giggle > 0) { kiki.userData.giggle -= dt; kiki.rotation.z = Math.sin(T * 30) * 0.08; } else kiki.rotation.z = 0;
+    if (st.restored && !ui.dialogOpen && !st.festival) {
+      const a = T * 0.35; const rr = 2.7; cat.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); cat.position.y = H(cat.position.x, cat.position.z); cat.rotation.y = -a; catPet.play('walk');
+    } else { if (!st.restored) cat.position.copy(CAT_HOME); catPet.play(ui.dialogOpen && p.pos.distanceTo(cat.position) < 4 ? 'gesture-positive' : st.festival ? 'dance' : 'idle'); }
+    if (ui.dialogOpen) { const d = p.pos.clone().sub(cat.position); if (d.length() < 4) cat.rotation.y = Math.atan2(d.x, d.z); }
+    chainLinks.forEach((l) => l.material.emissive.setHex(st.restored ? 0x553300 : 0x221100));
+    const bk = smooth(0.8, 1, life);
+    butterflies.forEach((b) => { b.g.visible = bk > 0.01; if (!b.g.visible) return; const t = T * 0.6 + b.ph; b.g.position.set(b.home.x + Math.sin(t) * 3, H(b.home.x, b.home.z) + 1.2 + Math.sin(t * 2.3) * 0.6, b.home.z + Math.cos(t * 0.8) * 3); b.g.rotation.y = t; const fl = Math.sin(T * 18 + b.ph) * 0.9; b.p1.rotation.y = fl; b.p2.rotation.y = -fl; b.g.scale.setScalar(bk); });
+    if (ringT >= 0) { ringT += dt; const s = ringT * 28; ring.scale.setScalar(s); ring.material.opacity = Math.max(0, 0.8 - ringT * 0.27); if (ringT > 3) ringT = -1; }
+    if (life > 0.9 && Math.random() < dt * 0.25) S.bird();
+    updateTales(dt, canMove);
+    if (st.festival) updateFestival(dt);
+  } else Rg.update && Rg.update(dt, canMove);
 
   // камера
   const tgt = p.pos.clone().add(new THREE.Vector3(0, 1.7, 0));
@@ -985,33 +1107,113 @@ function update(dt) {
   { // «пружинная» камера: не прячемся за деревьями
     const dir = cp.clone().sub(tgt); const len = dir.length(); dir.normalize();
     ray.set(tgt, dir); ray.far = len;
-    const near = camBlockers.filter((o) => Math.hypot(o.position.x - p.pos.x, o.position.z - p.pos.z) < len + 6);
+    const near = camBlockers.filter((o) => o.parent && o.parent.visible !== false && Math.hypot(o.position.x - p.pos.x, o.position.z - p.pos.z) < len + 8);
     const hit = ray.intersectObjects(near, true)[0];
     if (hit) cp.copy(tgt).addScaledVector(dir, Math.max(1.6, hit.distance - 0.4));
   }
-  cp.y = Math.max(cp.y, H(cp.x, cp.z) + 0.6, 0.6);
-  camera.position.lerp(cp, Math.min(1, dt * 10)); camera.lookAt(tgt);
+  cp.y = Math.max(cp.y, groundH(cp.x, cp.z) + 0.6, 0.6);
+  if (camOverride) cp.copy(camOverride.pos);
+  camera.position.lerp(cp, Math.min(1, dt * (camOverride ? 2.5 : 10))); camera.lookAt(camOverride ? camOverride.look : tgt);
+  if (shakeT > 0 && OPT.shake) { shakeT -= dt; camera.position.x += (Math.random() - 0.5) * shakeT; camera.position.y += (Math.random() - 0.5) * shakeT; }
   sun.position.copy(p.pos).add(new THREE.Vector3(25, 45, 18)); sun.target.position.copy(p.pos);
 
   // HUD
   if (started) {
-    ui.hud(p); ui.tracker(trackerHtml());
+    ui.hud(p, heroLabel()); ui.tracker(trackerHtml());
     const it = canMove ? nearest() : null; ui.prompt(it ? `F — ${it.label}` : '');
+    if (T - lastMM > 0.1) { lastMM = T; drawMinimap(); }
   }
 }
-function loop() { const dt = Math.min(0.05, clock.getDelta()); update(dt); renderer.render(scene, camera); requestAnimationFrame(loop); }
+let loopErr = 0;
+function loop() { requestAnimationFrame(loop); const dt = Math.min(0.05, clock.getDelta()); try { update(dt); } catch (e) { if (loopErr++ < 5) console.error('update', e); } renderer.render(scene, camera); }
+
+// ---------- регионы (острова Тридевятого) ----------
+const HERO_NAME = { ivan: 'Иван', vasilisa: 'Василиса Премудрая', finist: 'Финист — Ясный Сокол' };
+const lukGroup = new THREE.Group(); lukGroup.name = 'luk';
+{ const keepSet = new Set([hemi, sun, sun.target, skyDome, sea, ...Object.values(heroes).map((h) => h.root)]);
+  [...scene.children].forEach((o) => { if (!keepSet.has(o)) lukGroup.add(o); }); scene.add(lukGroup); }
+function lukSurface(x, z) { if (Math.hypot(x - SWAMP.x, z - SWAMP.y) < 9) return 'water'; if (H(x, z) < 0.7) return 'sand'; return 'grass'; }
+const LUK = { id: 'luk', name: 'Лукоморье', center: V2(0, 0), radius: 52, H, group: lukGroup, music: 'luk', sky: SKY, fogNear: 45, fogFar: 170, amb: { wind: 0.03, water: 0.06 }, spawn: () => new THREE.Vector3(FIRE.x + 2, 0, FIRE.y + 2.5) };
+const REGIONS = { luk: LUK };
+const CHAPTERS = {};
+for (const id of ['forest', 'mount', 'river', 'kosh']) CHAPTERS[id] = `./chapters/${id}.js`;
+const CHAPTER_READY = new Set([]);
+let region = LUK; const groundH = (x, z) => region.H(x, z);
+let lifeOverride = null, camOverride = null, lastMM = 0, festivalUpd = null;
+function updateFestival(dt) { festivalUpd && festivalUpd(dt); }
+function setRegion(id) {
+  const R = REGIONS[id]; Object.values(REGIONS).forEach((r) => (r.group.visible = r === R));
+  region = R; st.region = id;
+  scene.fog.near = R.fogNear ?? 45; scene.fog.far = R.fogFar ?? 170;
+  sea.visible = R.water !== false; sun.intensity = R.sun ?? 2.3;
+  S.setTheme(R.music); S.setAmbience(R.amb || {}); lifeShown = -1; lastMM = -1;
+}
+async function ensureRegion(id) {
+  if (REGIONS[id]) return REGIONS[id];
+  const mod = await import(CHAPTERS[id]); const R = mod.default(ctx);
+  R.group.visible = false; scene.add(R.group); REGIONS[id] = R; R.init && R.init(); return R;
+}
+async function travel(id, pos) {
+  const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic();
+  await wait(650);
+  let R; try { R = await ensureRegion(id); } catch (e) { console.error(e); ui.toast('Эта сказка ещё не написана…'); fade.style.opacity = 0; player.locked = wasLocked; return; }
+  setRegion(id);
+  const sp = pos || R.spawn(); player.pos.set(sp.x, Math.max(R.H(sp.x, sp.z), R.water === false ? -99 : 0.05), sp.z); player.vy = 0; player.onGround = true;
+  camYaw = Math.atan2(sp.x - R.center.x, sp.z - R.center.y); camPitch = 0.3; player.facing = camYaw + Math.PI;
+  if (id === 'luk' && pos) { camYaw = Math.atan2(sp.x, sp.z); player.facing = camYaw + Math.PI; }
+  camera.position.set(sp.x + Math.sin(camYaw) * 8, player.pos.y + 4, sp.z + Math.cos(camYaw) * 8);
+  life = lifeTarget = id === 'luk' ? baseLife() : R.life(); lifeShown = -1;
+  save(); await wait(250); fade.style.opacity = 0; player.locked = wasLocked;
+  ui.toast(R.name, true, 2600);
+  R.onEnter && R.onEnter();
+}
+function switchHero(k) {
+  if (!st.heroes.includes(k)) { ui.toast('Этот герой ещё не встретился в сказке.'); return; }
+  if (k === player.hero || ui.busy() || player.locked) return;
+  heroes[player.hero].root.visible = false; player.hero = k; st.hero = k;
+  const h = heroes[k]; h.root.visible = true; h.root.position.copy(player.pos); h.play('idle');
+  burst(player.pos.clone().setY(player.pos.y + 1), 0xffe27a, 30, 3, 0.8); S.magic(); ui.toast(`В сказке — ${HERO_NAME[k]}`); save();
+}
+function unlockHero(k) {
+  if (st.heroes.includes(k)) return; st.heroes.push(k); save(); S.fanfare();
+  ui.toast(`${HERO_NAME[k]} теперь с тобой! Клавиша ${['ivan', 'vasilisa', 'finist'].indexOf(k) + 1} (или 👥) — сменить героя.`, true, 5000);
+}
+// рельеф для глав: сетка с цветами вершин, обесцвечивается шейдером «жизни»
+function makeTerrain(cx, cz, size, seg, Hf, colorFn, parent) {
+  const g = new THREE.PlaneGeometry(size, size, seg, seg); g.rotateX(-Math.PI / 2);
+  const pos = g.attributes.position; const col = new Float32Array(pos.count * 3); const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) { const x = pos.getX(i) + cx, z = pos.getZ(i) + cz; const y = Hf(x, z); pos.setY(i, y); colorFn(x, z, y, c); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, lifeify(new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad }))); m.position.set(cx, 0, cz); m.receiveShadow = true; parent.add(m); return m;
+}
+function spawnEnemy(parent, pos, o = {}) {
+  const g = o.model ? o.model() : makeForgetling(); parent.add(g); g.position.copy(pos); if (o.scale) g.scale.setScalar(o.scale);
+  const e = Object.assign({ g, home: pos.clone(), hp: 3, alive: true, cd: 0, kb: new THREE.Vector3(), flash: 0, dying: 0, ph: Math.random() * 6 }, o); delete e.model;
+  enemies.push(e); return e;
+}
+function removeEnemies(group) { for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].group === group) { enemies[i].g.parent?.remove(enemies[i].g); enemies.splice(i, 1); } }
+const ctx = {
+  THREE, scene, S, ui, toon, grad, MD, KITS, KIT_ANIMS, kit, pet, npc, M, P: (n, x, z, s, ry, dy, parent, hf) => place(MD, parent || scene, n, x, (hf || groundH)(x, z) + (dy || 0), z, s ?? 1, ry ?? srand() * 6.28),
+  burst, makeChar, wait, srand, smooth, mixers, chars, colliders, camBlockers, interactables, enemies, hittables, player, heroes, keys, camera,
+  get st() { return st; }, save, addBook, addWord, travel, groundH, unlockHero, switchHero, hurtPlayer, hurtEnemy, toggleSight, shake, makeForgetling,
+  T: () => T, life: () => life, lifeify, lifeifyTree, uLife, objective: () => objective(), makeTerrain, spawnEnemy, removeEnemies, lockPlayer: (v) => (player.locked = v),
+  setLifeOverride: (v) => (lifeOverride = v), setCam: (v) => (camOverride = v), setFestival: (f) => (festivalUpd = f), outline, HERO_NAME, PORTAL3, LUK_PORTAL_POS: () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4),
+  region: () => region, REGIONS, fade: (v) => (document.getElementById('fade').style.opacity = v), mouseBlock: () => mouseBlock || keys.has('KeyK'), V2, SKY, cat, catPet, OAK,
+};
 
 // ---------- старт ----------
 function startGame(cont) {
   S.init();
   if (cont) { try { st = Object.assign(freshState(), JSON.parse(localStorage.getItem(SAVE_KEY))); } catch { st = freshState(); } }
   else { st = freshState(); save(); }
-  if (st.restored) { GAPS.forEach((g) => (chainLinks[g].visible = true)); S.startMusic(); }
+  if (st.restored) GAPS.forEach((g) => (chainLinks[g].visible = true));
+  if (!st.heroes.includes(st.hero)) st.hero = 'ivan';
+  Object.values(heroes).forEach((h) => (h.root.visible = false)); player.hero = st.hero; heroes[st.hero].root.visible = true;
   life = lifeTarget = baseLife(); lifeShown = -1;
   player.maxHp = st.turnip === 3 ? 6 : 5; player.hp = player.maxHp;
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
-  if (S.master && localStorage.getItem('tri_vol')) S.master.gain.value = +localStorage.getItem('tri_vol');
-  spawnEnemies();
+  applyOpt(); spawnEnemies();
+  if (st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region)) { travel(st.region); } else { st.region = 'luk'; setRegion('luk'); }
   document.getElementById('title').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   started = true;
@@ -1022,5 +1224,5 @@ if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont
 // фон титульного экрана: медленный облёт
 camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
-window.__game = { st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeTarget = v) };
+window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S };
 loop();

@@ -8,11 +8,11 @@ export class UI {
   }
   busy() { return this.dialogOpen || this.bookOpen; }
   set(id, html) { if (this._cache[id] !== html) { this._cache[id] = html; this.$(id).innerHTML = html; } }
-  hud(p) {
+  hud(p, label) {
     this.set('hearts', '❤'.repeat(Math.max(0, p.hp)) + '<span style="opacity:.25">' + '❤'.repeat(Math.max(0, p.maxHp - p.hp)) + '</span>');
     const w = Math.round(p.word);
     if (this._cache.w !== w) { this._cache.w = w; this.$('word').style.width = w + '%'; }
-    this.set('luck', p.luckCd <= 0 ? '🍀 R — Удача дурака: готова' : `🍀 Удача дурака: ${Math.ceil(p.luckCd)} с`);
+    this.set('luck', label || '');
   }
   tracker(html) { this.set('tracker', html); }
   prompt(text) { const el = this.$('prompt'); if (this._cache.prompt !== text) { this._cache.prompt = text; el.textContent = text || ''; el.style.display = text ? 'block' : 'none'; } }
@@ -80,7 +80,7 @@ export class UI {
   book(st, open) {
     this.bookOpen = open; this.$('book').classList.toggle('hidden', !open);
     if (!open) return;
-    this.$('bookCount').textContent = `Сказы: ${st.book.length}/5 · Забытые слова: ${st.words.length}/5`;
+    this.$('bookCount').textContent = `Сказы: ${st.book.length}/${this.totals?.book || 5} · Забытые слова: ${st.words.length}/${this.totals?.words || 5}`;
     this.$('bookList').innerHTML = st.book.length
       ? st.book.map((b) => `<div class="entry"><h4>${b.title}</h4><div>${b.text}</div></div>`).join('')
       : '<p class="muted">Пока пусто. Свяжи первую Нить Сказа.</p>';
