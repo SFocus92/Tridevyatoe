@@ -3,7 +3,9 @@
 Добрая 3D-сказка для детей 8–16 лет: Тридевятое царство всё забыло и стало серым, а ты — **Сказитель** — возвращаешь миру краски, вспоминая русские народные сказки. Игра идёт прямо в браузере (three.js), ничего устанавливать не нужно.
 
 ## ▶ Играть
-**https://raw.githack.com/SFocus92/Tridevyatoe/main/index.html** — на заставке githack нажми «Open the page».
+**https://rawcdn.githack.com/SFocus92/Tridevyatoe/a8edac5/index.html** — версия 1.0 (на заставке githack нажми «Open the page»).
+
+Самая свежая версия из ветки main: https://raw.githack.com/SFocus92/Tridevyatoe/main/index.html (githack обновляет кэш с задержкой).
 
 Если в репозитории включены GitHub Pages (Settings → Pages → Deploy from a branch → `main` / `(root)`), игра будет и тут: https://sfocus92.github.io/Tridevyatoe/
 
