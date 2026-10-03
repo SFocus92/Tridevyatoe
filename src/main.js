@@ -486,6 +486,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------- интерактив ----------
 const interactables = [
   { label: 'Поговорить с Котом учёным', pos: () => cat.position, r: 3.2, act: () => catTalk() },
+  { label: 'Послушать Кота учёного', pos: () => cat.position, r: 3.6, prio: 6, cond: () => st.festival && !st.finalTale, act: () => finalTale() },
   { label: 'Окликнуть русалку на ветвях', pos: () => MERMAID_GROUND, r: 3.5, cond: () => !st.links.mermaid, act: () => mermaidTalk() },
   { label: 'Говорить с Кикиморой', pos: () => KIKI_POS, r: 3.5, cond: () => !st.links.kiki, act: () => kikiTalk() },
   { label: 'Поднять звено цепи', pos: () => GROVE_LINK.position, r: 2.8, cond: () => st.groveCleared && !st.links.grove && player.sight, act: () => getLink('grove', GROVE_LINK.position) },
@@ -516,6 +517,11 @@ function getLink(key, fromPos) {
 }
 
 const CAT = 'Кот учёный', MER = 'Русалка', KIKI = 'Кикимора', IVAN = 'Иван';
+async function finalTale() {
+  const E = { break: 'Ты сломал иглу — и Кощей сгинул. Так кончаются многие сказки.', cycle: 'Ты вернул иглу в сундук — и Кощей уснул. Сказка замкнулась в кольцо: однажды её расскажут снова.', new: 'Ты рассказал Кощею его собственную сказку — и даже он вспомнил, как жить. Такого финала не знала ни одна книга!' }[st.ending] || '';
+  await ui.say(CAT, ['Мур-р… Вот и рассказана сказка, Сказитель. Лес помнит Ягу, горы — Морозко, реки — Алёнушку с братцем.', E, 'А знаешь, что главное? Сказки не умирают — их рассказывают. Пока ты помнишь — Тридевятое живо.', `Ты собрал сказов: ${st.book.length + 1} из ${BOOK_TOTAL}, заветных слов: ${st.words.length} из ${WORDS_TOTAL}. ${st.words.length < WORDS_TOTAL ? 'Начни сказку заново — может, найдёшь другой финал!' : 'Все слова — твои. Настоящий Сказитель!'}`]);
+  st.finalTale = true; addBook('Сказитель', 'Однажды Тридевятое царство всё забыло — и стало серым. Пришёл Сказитель, вспомнил сказки одну за другой, и мир снова ожил. С тех пор у Лукоморья, у дуба зелёного, каждый вечер рассказывают эту историю.'); save(); S.fanfare();
+}
 async function catTalk() {
   if (st.stage === 0) {
     await ui.say(CAT, [
@@ -819,7 +825,8 @@ function lukObjective() {
   if (!st.mount.done) return [PORTAL3, 'через портал — в Ледяные горы'];
   if (!st.river.done) return [PORTAL3, 'через портал — к Молочным рекам'];
   if (!st.kosh.done) return [PORTAL3, 'через портал — в царство Кощея'];
-  return [cat.position, 'к коту — сказка рассказана! Послушай его'];
+  if (!st.finalTale) return [cat.position, 'к коту — сказка рассказана! Послушай его'];
+  return [cat.position, 'сказка рассказана! Гуляй по Тридевятому — или начни новую'];
 }
 async function koloTalk() { const [, txt] = objective(); await ui.say(KOLO, [`Покатили ${txt}! Я впереди.`]); }
 function collectFeather(f) {
@@ -1137,12 +1144,12 @@ const LUK = { id: 'luk', name: 'Лукоморье', center: V2(0, 0), radius: 5
 const REGIONS = { luk: LUK };
 const CHAPTERS = {};
 for (const id of ['forest', 'mount', 'river', 'kosh']) CHAPTERS[id] = `./chapters/${id}.js`;
-const CHAPTER_READY = new Set([]);
+const CHAPTER_READY = new Set(['forest', 'mount', 'river', 'kosh']);
 let region = LUK; const groundH = (x, z) => region.H(x, z);
 let lifeOverride = null, camOverride = null, lastMM = 0, festivalUpd = null;
 function updateFestival(dt) { festivalUpd && festivalUpd(dt); }
 function setRegion(id) {
-  const R = REGIONS[id]; Object.values(REGIONS).forEach((r) => (r.group.visible = r === R));
+  const R = REGIONS[id]; if (region && region !== R && region.onLeave) region.onLeave(); Object.values(REGIONS).forEach((r) => (r.group.visible = r === R));
   region = R; st.region = id;
   scene.fog.near = R.fogNear ?? 45; scene.fog.far = R.fogFar ?? 170;
   sea.visible = R.water !== false; sun.intensity = R.sun ?? 2.3;
@@ -1214,6 +1221,7 @@ function startGame(cont) {
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
   applyOpt(); spawnEnemies();
   if (st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region)) { travel(st.region); } else { st.region = 'luk'; setRegion('luk'); }
+  if (st.festival) ensureRegion('kosh').then((R) => R.startFestival && R.startFestival());
   document.getElementById('title').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   started = true;
@@ -1224,5 +1232,5 @@ if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont
 // фон титульного экрана: медленный облёт
 camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
-window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S };
+window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S, cam: { get yaw() { return camYaw; }, set yaw(v) { camYaw = v; } } };
 loop();
