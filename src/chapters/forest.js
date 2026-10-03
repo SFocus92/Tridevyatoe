@@ -36,7 +36,7 @@ export default function forest(ctx) {
   const body = new THREE.Group(); hut.add(body); body.position.y = 3.6;
   const logM = toon(0x7a4f2a), logD = toon(0x5a3a1e), roofM = toon(0x8a6a3a), legM = toon(0xe8a84a), clawM = toon(0x6b5a3a);
   for (let i = 0; i < 7; i++) { const y = i * 0.5 + 0.25; for (const [w, d, x, z, ry] of [[4.8, 0, 0, 2, 0], [4.8, 0, 0, -2, 0], [4.4, 0, 2.2, 0, Math.PI / 2], [4.4, 0, -2.2, 0, Math.PI / 2]]) { const l = M(new THREE.CylinderGeometry(0.27, 0.27, w, 8), i % 2 ? logM : logD, x, y, z, body); l.rotation.set(0, ry, Math.PI / 2); l.castShadow = true; } }
-  const roof = M(new THREE.CylinderGeometry(3.4, 3.4, 5.4, 3, 1), roofM, 0, 4.4, 0, body); roof.rotation.set(Math.PI / 2, 0, Math.PI / 2); roof.scale.set(1, 1, 0.55);
+  const roof = M(new THREE.CylinderGeometry(3.4, 3.4, 5.4, 3, 1), roofM, 0, 4.4, 0, body); roof.rotation.set(-Math.PI / 2, 0, Math.PI / 2); roof.scale.set(1, 1, 0.55); // конёк вверх
   M(new THREE.BoxGeometry(0.7, 1.6, 0.7), toon(0x8a8580), 1.3, 5.2, -0.8, body);
   const winM = new THREE.MeshBasicMaterial({ color: 0xffd060 }); M(new THREE.PlaneGeometry(1, 0.9), winM, 0, 2, 2.3, body); M(new THREE.PlaneGeometry(1, 0.9), winM, 0, 2, -2.31, body).rotation.y = Math.PI;
   M(new THREE.BoxGeometry(1.4, 0.15, 0.15), toon(0xc8302a), 0, 2.5, 2.36, body); M(new THREE.BoxGeometry(1.4, 0.15, 0.15), toon(0xc8302a), 0, 1.52, 2.36, body);

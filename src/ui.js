@@ -35,7 +35,10 @@ export class UI {
   dialog(speaker, text, choices = null) {
     this.dialogOpen = true; this._openedAt = performance.now(); document.body.classList.add('dlg');
     text = touchText(text); if (choices) choices = choices.map(touchText);
-    try { this.onSpeak && this.onSpeak(speaker, text); } catch {}
+    // озвучка: текст печатается в темпе голоса (начинает, когда голос зазвучал, и подтягивается по словам), а не убегает вперёд
+    const sync = { on: false, started: false, said: 0, end: false };
+    try { sync.on = !!(this.onSpeak && this.onSpeak(speaker, text, { start: () => (sync.started = true), word: (k) => { sync.got = true; sync.said = Math.max(sync.said, k); }, end: () => (sync.end = true) })); } catch {}
+    const t0 = performance.now();
     this.$('dialog').classList.remove('hidden');
     this.$('dSpeaker').textContent = speaker;
     this.$('dHint').style.display = choices ? 'none' : 'block';
@@ -51,7 +54,17 @@ export class UI {
       });
     };
     this._full = () => { clearInterval(this._typing); this._typing = null; t.textContent = text; if (!box.children.length) showChoices(); };
-    this._typing = setInterval(() => { i += 2; t.textContent = text.slice(0, i); if (i >= text.length) this._full(); }, 16);
+    const cps = 14 * (this.voiceRate ? this.voiceRate() : 1); // ≈ букв в секунду у голоса
+    this._typing = setInterval(() => {
+      if (!sync.on) i += 2;
+      else {
+        if (sync.end) i = text.length;
+        else if (!sync.started && performance.now() - t0 < 900) return; // ждём, пока голос начнёт
+        else { const said = Math.round(sync.said * text.length / Math.max(1, sync.cleanLen || text.length)); if (said > i) i = said; else if (!sync.got || i < said + 28) i += cps * 0.016; }
+      }
+      t.textContent = text.slice(0, Math.floor(i)); if (i >= text.length) this._full();
+    }, 16);
+    sync.cleanLen = this.cleanLen ? this.cleanLen(text) : text.length;
     return new Promise((res) => { this._resolve = res; });
   }
   _close(v) {

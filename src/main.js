@@ -944,6 +944,15 @@ for (const [id, key] of [['optMaster', 'master'], ['optMusic', 'music'], ['optSf
 for (const [id, key] of [['optInvY', 'invY'], ['optHelp', 'help'], ['optShake', 'shake'], ['optVoice', 'voice'], ['optDay', 'daynight']]) {
   const el = document.getElementById(id); el.checked = OPT[key]; el.onchange = () => { OPT[key] = el.checked; saveOpt(); applyOpt(); };
 }
+// озвучка текста: галочка в настройках, кнопка 🔊 в окне диалога и клавиша V — выключение сразу обрывает голос
+function setVoice(on) { OPT.voice = on; saveOpt(); if (!on) ui.voiceOff?.(); document.getElementById('optVoice').checked = on; const b = document.getElementById('dVoice'); b.textContent = on ? '🔊' : '🔇'; b.classList.toggle('off', !on); }
+document.getElementById('optVoice').onchange = (e) => setVoice(e.target.checked);
+document.getElementById('dVoice').addEventListener('click', (e) => { e.stopPropagation(); setVoice(!OPT.voice); });
+document.getElementById('dVoice').addEventListener('pointerdown', (e) => e.stopPropagation());
+document.getElementById('dVoice').addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+addEventListener('keydown', (e) => { if (e.code === 'KeyV' && !e.repeat && !(e.target instanceof HTMLInputElement)) setVoice(!OPT.voice); });
+{ const el = document.getElementById('optVoiceRate'); el.value = OPT.voiceRate || 1; el.oninput = () => { OPT.voiceRate = +el.value; saveOpt(); }; }
+setVoice(OPT.voice !== false);
 { const el = document.getElementById('optQuality'); el.value = OPT.quality; el.onchange = () => { OPT.quality = el.value; saveOpt(); applyQuality(); }; }
 const joy = { x: 0, y: 0, id: null };
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;

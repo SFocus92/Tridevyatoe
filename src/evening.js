@@ -203,14 +203,28 @@ export function initEvening(c, X) {
   // ---------- озвучка ----------
   const VOICE = { 'Кот учёный': [0.75, 0.95], 'Русалка': [1.5, 1], 'Кикимора': [1.7, 1.12], 'Дед': [0.6, 0.9], 'Баба-Яга': [1.35, 0.92], 'Кощей': [0.3, 0.85], 'Кощей Бессмертный': [0.3, 0.85], 'Морозко': [0.45, 0.85], 'Снегурочка': [1.55, 1], 'Леший': [0.5, 0.95], 'Жар-птица': [1.8, 1.05], 'Щука': [0.9, 0.95], 'Колобок': [1.8, 1.25], 'Мышка-норушка': [2, 1.25], 'Алёнушка': [1.5, 1], 'Финист — Ясный Сокол': [0.9, 1], 'Василиса Премудрая': [1.25, 0.95], 'Иван': [1, 1.05] };
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null; let ruVoice = null;
-  const pickVoice = () => { if (!synth) return; const vs = synth.getVoices(); ruVoice = vs.find((v) => /^ru/i.test(v.lang) && /google|milena|yandex|natural/i.test(v.name)) || vs.find((v) => /^ru/i.test(v.lang)) || null; };
+  // предпочитаем голоса устройства (localService): они начинают говорить сразу, сетевые (Google) запаздывают на 0,5–2 с
+  const pickVoice = () => { if (!synth) return; const vs = synth.getVoices().filter((v) => /^ru/i.test(v.lang)); ruVoice = vs.find((v) => v.localService && /milena|yandex|natural|irina|pavel|anna|katya/i.test(v.name)) || vs.find((v) => v.localService) || vs.find((v) => /google|natural/i.test(v.name)) || vs[0] || null; };
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
-  ui.onSpeak = (who, text) => {
-    if (!synth || !OPT.voice || !ruVoice) return; synth.cancel();
-    const clean = String(text).replace(/\([^)]*\)/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ' ').replace(/[«»]/g, '').trim(); if (!clean) return;
-    const u = new SpeechSynthesisUtterance(clean); u.voice = ruVoice; u.lang = ruVoice.lang; const [pi, ra] = VOICE[who] || [1, 1]; u.pitch = pi; u.rate = ra * (OPT.voiceRate || 1); u.volume = Math.min(1, (OPT.master ?? 0.7) * 1.3); synth.speak(u);
+  const clean = (text) => String(text).replace(/\([^)]*\)/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ' ').replace(/[«»]/g, '').trim();
+  let keep = null, warmed = false, cur = null;
+  const warm = () => { if (warmed || !synth || !ruVoice || !OPT.voice) return; warmed = true; try { const u = new SpeechSynthesisUtterance(' '); u.voice = ruVoice; u.volume = 0; synth.speak(u); } catch {} }; // «прогрев» движка речи по первому касанию
+  addEventListener('pointerdown', warm, { once: false, passive: true }); addEventListener('keydown', warm, { passive: true });
+  const hush = () => { cur = null; clearInterval(keep); keep = null; if (synth && (synth.speaking || synth.pending)) synth.cancel(); };
+  ui.cleanLen = (text) => clean(text).length || 1;
+  ui.voiceRate = () => OPT.voiceRate || 1;
+  ui.onSpeak = (who, text, hooks) => {
+    hush(); if (!synth || !OPT.voice || !ruVoice) return false;
+    const c = clean(text); if (!c) return false;
+    const u = new SpeechSynthesisUtterance(c); u.voice = ruVoice; u.lang = ruVoice.lang; const [pi, ra] = VOICE[who] || [1, 1]; u.pitch = pi; u.rate = ra * (OPT.voiceRate || 1); u.volume = Math.min(1, (OPT.master ?? 0.7) * 1.3);
+    cur = u; const mine = (f) => (e) => { if (cur === u) f(e); };
+    u.onstart = mine(() => hooks?.start()); u.onboundary = mine((e) => hooks?.word(e.charIndex + (e.charLength || 0))); u.onend = u.onerror = mine(() => { hooks?.end(); clearInterval(keep); keep = null; });
+    synth.speak(u); if (synth.paused) synth.resume();
+    if (!ruVoice.localService) keep = setInterval(() => { if (synth.speaking && !synth.paused) { synth.pause(); synth.resume(); } }, 9000); // Chrome обрывает длинные фразы сетевых голосов
+    return true;
   };
-  ui.onHush = () => { if (synth && OPT.voice) synth.cancel(); };
+  ui.onHush = () => hush();
+  ui.voiceOff = () => hush();
   const hasVoice = () => !!ruVoice;
 
   // ---------- обереги и доверие ----------
