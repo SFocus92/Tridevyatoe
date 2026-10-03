@@ -25,7 +25,7 @@ export default function kosh(ctx) {
   homePortal(ctx, group, SPAWN.x + 8, SPAWN.z + 1, H, -0.3); const HOME = V(SPAWN.x + 8, SPAWN.z + 1);
   const fire = campfire(ctx, group, FIRE.x, FIRE.z, H);
   // замок
-  const darkT = (o, c = 0x6a6070) => { o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.color = new THREE.Color(c); ctx.lifeify(m.material); } }); return o; };
+  const darkMats = {}; const darkT = (o, c = 0x6a6070) => { const mt = darkMats[c] || (darkMats[c] = ctx.lifeify(new THREE.MeshToonMaterial({ color: c, gradientMap: ctx.grad }))); o.traverse((m) => { if (m.isMesh) m.material = mt; }); return o; };
   const WR = 13, gateA = Math.atan2(GATE.x - CAS.x, GATE.z - CAS.z); const gateParts = [];
   for (let i = 0; i < 22; i++) {
     const a = (i / 22) * Math.PI * 2; let da = a - gateA; da = Math.atan2(Math.sin(da), Math.cos(da)); const x = CAS.x + Math.sin(a) * WR, z = CAS.z + Math.cos(a) * WR;

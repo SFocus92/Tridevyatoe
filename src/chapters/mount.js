@@ -27,7 +27,7 @@ export default function mount(ctx) {
   homePortal(ctx, group, SPAWN.x + 8, SPAWN.z + 1, H, -0.3); const HOME = V(SPAWN.x + 8, SPAWN.z + 1);
   const fires = FIRES.map((f) => campfire(ctx, group, f.x, f.z, H));
   // ледяной терем Морозко
-  const iceTint = (o) => { o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.color = new THREE.Color(0xd8ecff); ctx.lifeify(m.material); } }); return o; };
+  const iceMat = ctx.lifeify(new THREE.MeshToonMaterial({ color: 0xcfeaff, gradientMap: ctx.grad, emissive: 0x15304a })); const iceTint = (o) => { o.traverse((m) => { if (m.isMesh) m.material = iceMat; }); return o; };
   const PAL = V(MOROZ.x, MOROZ.z - 9);
   [[-7, 0, 'castle/tower-hexagon-base'], [7, 0, 'castle/tower-hexagon-base'], [0, -3, 'castle/tower-square']].forEach(([dx, dz, n]) => {
     const x = PAL.x + dx, z = PAL.z + dz; const y = H(x, z) - 0.2; const s = 4.2;

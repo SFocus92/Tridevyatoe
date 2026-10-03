@@ -965,7 +965,7 @@ function trackerHtml() {
   if (st.stage === 0) h = '<b>📜 Пробуждение</b><br>• Поговори с Котом учёным у дуба (F)';
   else if (st.stage === 1) h = `<b>📜 Цепь златая</b><br>${ck(st.links.mermaid)} Звено русалки — загадки (${st.riddle}/3)<br>${ck(st.links.grove)} Звено берёзовой рощи${st.groveCleared ? '' : ' — забудки'}<br>${ck(st.links.kiki)} Звено Кикиморы — болото<br><i style="opacity:.8">Q — увидеть Нити Сказа</i>`;
   else if (st.stage === 2) h = '<b>📜 Цепь златая</b><br>• Скрепи цепь у дуба (F у ствола)';
-  else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>• Портал проснулся — шагни в него`;
+  else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>${st.festival ? '🎉 Праздник! ' + (st.finalTale ? 'Сказка рассказана' : 'Послушай кота') : st.kosh.done ? '• Сказка почти рассказана' : '• Портал проснулся — шагни в него'}`;
   if (st.stage >= 1) {
     const nf = st.feathers.filter(Boolean).length;
     h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7`;
@@ -1017,7 +1017,7 @@ function update(dt) {
   { const cx = p.pos.x - Rg.center.x, cz = p.pos.z - Rg.center.y, r = Math.hypot(cx, cz); if (r > Rg.radius) { p.pos.x = Rg.center.x + (cx * Rg.radius) / r; p.pos.z = Rg.center.y + (cz * Rg.radius) / r; } }
   const gh = Math.max(groundH(p.pos.x, p.pos.z), Rg.water === false ? -99 : 0.05);
   const gliding = p.hero === 'finist' && !p.onGround && keys.has('Space') && p.vy < 0 && canMove;
-  p.vy -= (gliding ? 6 : 26) * dt; if (gliding) p.vy = Math.max(p.vy, -2.2);
+  p.vy -= (gliding ? 6 : 26) * dt; if (gliding) p.vy = Math.max(p.vy, -1.8);
   p.pos.y += p.vy * dt;
   if (p.pos.y <= gh) { if (!p.onGround && p.vy < -8) { S.land(); burst(p.pos.clone(), 0xd8d0c0, 8, 2, 0.4, 0.15); } p.pos.y = gh; p.vy = 0; p.onGround = true; p.jumps = 0; } else if (p.pos.y > gh + 0.05) p.onGround = false;
   if (gliding && Math.random() < dt * 20) burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffe0a0, 1, 0.5, 0.6, 0.12);
