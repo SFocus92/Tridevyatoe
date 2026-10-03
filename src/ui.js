@@ -1,3 +1,15 @@
+const KEYICON = { F: '✋', Q: '👁', R: '✨', B: '📖', T: '🐟', J: '⚔', K: '🛡', H: '', P: '⚙' };
+export const isTouchDevice = () => matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+// на телефоне подсказки вида «Нажми Q», «(F)», «клавише T» показываем значками кнопок
+export function touchText(t) {
+  if (!t || !document.body.classList.contains('touch')) return t;
+  return String(t)
+    .replace(/\(([FQRBTJK])\)/g, (m, k) => `(${KEYICON[k]})`)
+    .replace(/([Нн]ажми|[Нн]ажать|клавиш[аеуиы]?|кнопк[аеуи]) ([FQRBTJK])(?![a-zA-Z])/g, (m, w, k) => `${w} ${KEYICON[k]}`)
+    .replace(/(^|[\s«(>])([FQRBTJK]) — /g, (m, a, k) => `${a}${KEYICON[k]} — `)
+    .replace(/[Пп]робел/g, (m) => (m[0] === 'П' ? 'Кнопка ⤴' : 'кнопка ⤴'))
+    .replace(/ЛКМ\/J|ЛКМ/g, '⚔').replace(/ПКМ\/K|ПКМ/g, '🛡');
+}
 export class UI {
   constructor() {
     this.$ = (id) => document.getElementById(id);
@@ -12,16 +24,18 @@ export class UI {
     this.set('hearts', '❤'.repeat(Math.max(0, p.hp)) + '<span style="opacity:.25">' + '❤'.repeat(Math.max(0, p.maxHp - p.hp)) + '</span>');
     const w = Math.round(p.word);
     if (this._cache.w !== w) { this._cache.w = w; this.$('word').style.width = w + '%'; }
-    this.set('luck', label || '');
+    this.set('luck', touchText(label || ''));
   }
-  tracker(html) { this.set('tracker', html); }
-  prompt(text) { const el = this.$('prompt'); if (this._cache.prompt !== text) { this._cache.prompt = text; el.textContent = text || ''; el.style.display = text ? 'block' : 'none'; } }
+  tracker(html) { this.set('tracker', touchText(html)); }
+  prompt(text) { const el = this.$('prompt'); if (this._cache.prompt !== text) { this._cache.prompt = text; el.textContent = touchText(text) || ''; el.style.display = text ? 'block' : 'none'; } }
   toast(text, big = false, ms = 2600) {
     const d = document.createElement('div'); d.className = 'toast' + (big ? ' big' : ''); d.textContent = text;
     this.$('toasts').appendChild(d); setTimeout(() => d.remove(), ms);
   }
   dialog(speaker, text, choices = null) {
-    this.dialogOpen = true; this._openedAt = performance.now();
+    this.dialogOpen = true; this._openedAt = performance.now(); document.body.classList.add('dlg');
+    text = touchText(text); if (choices) choices = choices.map(touchText);
+    try { this.onSpeak && this.onSpeak(speaker, text); } catch {}
     this.$('dialog').classList.remove('hidden');
     this.$('dSpeaker').textContent = speaker;
     this.$('dHint').style.display = choices ? 'none' : 'block';
@@ -41,7 +55,8 @@ export class UI {
     return new Promise((res) => { this._resolve = res; });
   }
   _close(v) {
-    this.dialogOpen = false; this.$('dialog').classList.add('hidden');
+    this.dialogOpen = false; this.$('dialog').classList.add('hidden'); document.body.classList.remove('dlg');
+    try { this.onHush && this.onHush(); } catch {}
     const r = this._resolve; this._resolve = null; r && r(v);
   }
   _choose(k) { if (this._typing) { this._full(); return; } this._close(k); }
@@ -60,7 +75,7 @@ export class UI {
   // мини-игра «тянем-потянем»: остановить бегунок в зелёной зоне
   timing(title, speed = 1) {
     return new Promise((res) => {
-      const box = this.$('timing'); box.classList.remove('hidden'); this.dialogOpen = true;
+      const box = this.$('timing'); box.classList.remove('hidden'); this.dialogOpen = true; document.body.classList.add('dlg');
       this.$('tTitle').textContent = title;
       const zone = this.$('tZone'), ptr = this.$('tPtr');
       const zw = 16 + Math.random() * 6, zx = 15 + Math.random() * (70 - zw); zone.style.left = zx + '%'; zone.style.width = zw + '%';
@@ -71,7 +86,7 @@ export class UI {
         if (e.type === 'keydown' && !['Space', 'KeyF', 'Enter'].includes(e.code)) return;
         e.preventDefault(); done = true; removeEventListener('keydown', stop); box.removeEventListener('pointerdown', stop);
         const ok = x >= zx && x <= zx + zw; ptr.classList.add(ok ? 'ok' : 'bad');
-        setTimeout(() => { ptr.classList.remove('ok', 'bad'); box.classList.add('hidden'); this.dialogOpen = false; res(ok); }, 550);
+        setTimeout(() => { ptr.classList.remove('ok', 'bad'); box.classList.add('hidden'); this.dialogOpen = false; document.body.classList.remove('dlg'); res(ok); }, 550);
       };
       setTimeout(() => { addEventListener('keydown', stop); box.addEventListener('pointerdown', stop); }, 250);
     });
@@ -85,5 +100,6 @@ export class UI {
       ? st.book.map((b) => `<div class="entry"><h4>${b.title}</h4><div>${b.text}</div></div>`).join('')
       : '<p class="muted">Пока пусто. Свяжи первую Нить Сказа.</p>';
     this.$('wordList').innerHTML = st.words.length ? st.words.map((w) => `<div class="entry"><b>${w.word}</b> — ${w.text}</div>`).join('') : '<p class="muted">Ни одного. Кот учёный иногда ошибается — слушай внимательно.</p>';
+    const ex = this.$('extraList'); if (ex) ex.innerHTML = this.extra ? this.extra(st) : '';
   }
 }

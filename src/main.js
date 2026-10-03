@@ -5,6 +5,8 @@ import { UI } from './ui.js';
 import { loadModels, place, instanced, loadKits } from './assets.js';
 import { initCharacters, makeChar, skinOf } from './characters.js';
 import { uLife, lifeify, lifeifyTree } from './life.js';
+import { initEvening, RETELL } from './evening.js';
+window.__RET = RETELL;
 
 const S = new Sound();
 const ui = new UI();
@@ -415,7 +417,7 @@ function attack() {
     if (!e.alive || !e.g.parent?.visible) continue;
     const d = e.g.position.clone().sub(player.pos); const dy = Math.abs(d.y); d.y = 0;
     if (d.length() < reach + (e.big || 0) && dy < 4 + (e.big || 0) && d.normalize().dot(fwd) > 0.2) {
-      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1) * (hero === 'ivan' ? 1.5 : 1);
+      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1) * (hero === 'ivan' ? 1.5 : 1) * (player.dmgK || 1);
       if (hurtEnemy(e, dmg, player.pos)) hitAny = true;
     }
   }
@@ -555,7 +557,7 @@ async function catTalk() {
       st.words.push({ word: 'Лукоморье', text: 'изогнутый морской берег, залив. Место, где сходятся все сказки — и откуда начинается любая дорога.' });
       S.chime(); save();
       await ui.say(CAT, ['Мур… А ведь правда! Поймал старика. Вот что значит — Сказитель: помнишь, как было на самом деле.', 'Держи забытое слово: «ЛУКОМОРЬЕ». В каждой земле спрятано такое. Собери все — узнаешь, кем был Кощей.']);
-      ui.toast('Найдено забытое слово 1/5', true);
+      ui.toast(`Найдено забытое слово 1/${WORDS_TOTAL}`, true);
     } else await ui.say(CAT, ['Мур-р… Ну, раз ты так говоришь. (Кот хитро щурится. Кажется, он что-то перепутал.)']);
     return;
   }
@@ -600,7 +602,8 @@ async function kikiTalk() {
 }
 async function fireTalk() {
   player.hp = player.maxHp; player.word = 100;
-  await ui.say(IVAN, [st.restored ? 'Тепло. Где-то поёт кот, шумит море. Хорошо.' : 'Костёр — единственное, что тут ещё помнит, каким бывает тепло. (Здоровье и Слово восполнены.)']);
+  if (st.restored && EV) { await EV.fireMenu(); return; }
+  await ui.say(IVAN, ['Костёр — единственное, что тут ещё помнит, каким бывает тепло. (Здоровье и Слово восполнены.)']);
 }
 async function portalTalk() {
   if (!st.restored) { await ui.say(IVAN, ['Каменная арка. Внутри — серая муть. Нить Лукоморья порвана, дальше дороги нет.']); return; }
@@ -712,10 +715,10 @@ const FEATHERS = [[-40, -10, 0], [38, -6, 1], [4, -42, 0], [-24, -26, 1], [18, 3
 const DED = 'Дед', MOUSEN = 'Мышка-норушка', PIKEN = 'Щука', KOLO = 'Колобок';
 function addBook(title, text) {
   if (st.book.some((b) => b.title === title)) return;
-  st.book.push({ title, text }); save(); ui.toast(`📖 Новый сказ в Книге: «${title}» (${st.book.length}/5)`, false, 3500);
+  st.book.push({ title, text }); save(); ui.toast(`📖 Новый сказ в Книге: «${title}» (${st.book.length}/${BOOK_TOTAL})`, false, 3500);
   if (st.book.length === 5) setTimeout(() => ui.toast('Все сказы Лукоморья собраны! Кот учёный хочет тебе кое-что сказать.', true, 4500), 2500);
 }
-function addWord(word, text) { if (st.words.some((w) => w.word === word)) return; st.words.push({ word, text }); save(); S.chime(); ui.toast(`Найдено забытое слово ${st.words.length}/5: «${word}»`, true); }
+function addWord(word, text) { if (st.words.some((w) => w.word === word)) return; st.words.push({ word, text }); save(); S.chime(); ui.toast(`Найдено забытое слово ${st.words.length}/${WORDS_TOTAL}: «${word}»`, true); }
 async function stoneTalk() {
   st.stoneReads++; save();
   if (st.stoneReads < 3) {
@@ -909,7 +912,7 @@ function updateTales(dt, canMove) {
 
 // ---------- настройки и сенсорное управление ----------
 const settingsEl = document.getElementById('settings');
-const OPT = Object.assign({ master: 0.7, music: 0.6, sfx: 0.8, sens: 1, invY: false, help: true, quality: 'medium', shake: true }, (() => { try { return JSON.parse(localStorage.getItem('tri_opts') || '{}'); } catch { return {}; } })());
+const OPT = Object.assign({ master: 0.7, music: 0.6, sfx: 0.8, sens: 1, invY: false, help: true, quality: 'medium', shake: true, voice: true, daynight: true, voiceRate: 1 }, (() => { try { return JSON.parse(localStorage.getItem('tri_opts') || '{}'); } catch { return {}; } })());
 const saveOpt = () => localStorage.setItem('tri_opts', JSON.stringify(OPT));
 function applyQuality() {
   const q = OPT.quality; renderer.setPixelRatio(q === 'low' ? Math.min(devicePixelRatio, 1) * 0.75 : q === 'high' ? Math.min(devicePixelRatio, 2) : Math.min(devicePixelRatio, 1.5));
@@ -925,12 +928,14 @@ function applyOpt() {
 function toggleSettings(open) { settingsEl.classList.toggle('hidden', !open); ui.bookOpen = open; if (open) document.exitPointerLock(); }
 document.getElementById('btnGear').onclick = () => toggleSettings(true);
 document.getElementById('optClose').onclick = () => toggleSettings(false);
+document.getElementById('optX').onclick = () => toggleSettings(false);
+document.getElementById('bookClose').onclick = () => ui.book(st, false);
 document.getElementById('optReset').onclick = () => { if (confirm('Начать сказку заново? Прогресс сотрётся.')) { localStorage.removeItem(SAVE_KEY); location.reload(); } };
 document.getElementById('optFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); };
 for (const [id, key] of [['optMaster', 'master'], ['optMusic', 'music'], ['optSfx', 'sfx'], ['optSens', 'sens']]) {
   const el = document.getElementById(id); el.value = OPT[key]; el.oninput = () => { OPT[key] = +el.value; saveOpt(); applyOpt(); if (key === 'sfx') S.click(); };
 }
-for (const [id, key] of [['optInvY', 'invY'], ['optHelp', 'help'], ['optShake', 'shake']]) {
+for (const [id, key] of [['optInvY', 'invY'], ['optHelp', 'help'], ['optShake', 'shake'], ['optVoice', 'voice'], ['optDay', 'daynight']]) {
   const el = document.getElementById(id); el.checked = OPT[key]; el.onchange = () => { OPT[key] = el.checked; saveOpt(); applyOpt(); };
 }
 { const el = document.getElementById('optQuality'); el.value = OPT.quality; el.onchange = () => { OPT.quality = el.value; saveOpt(); applyQuality(); }; }
@@ -938,6 +943,10 @@ const joy = { x: 0, y: 0, id: null };
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 applyQuality(); applyOpt();
 if (isTouch) {
+  document.body.classList.add('touch');
+  // подсказка над кнопками — сама по себе кнопка «действие»: тап по ней начинает разговор
+  document.getElementById('prompt').addEventListener('pointerdown', (e) => { e.preventDefault(); if (started && !ui.busy() && !player.locked) interact(); });
+  document.querySelector('#timing .muted').textContent = 'Тапни, когда бегунок в зелёной зоне!';
   document.getElementById('touch').classList.remove('hidden'); document.getElementById('help').classList.add('hidden');
   const jz = document.getElementById('joy'), knob = document.getElementById('joyKnob');
   const setJ = (t) => { const r = jz.getBoundingClientRect(); let dx = t.clientX - (r.left + r.width / 2), dy = t.clientY - (r.top + r.height / 2); const l = Math.hypot(dx, dy), mx = r.width / 2 - 20; if (l > mx) { dx *= mx / l; dy *= mx / l; } joy.x = dx / mx; joy.y = dy / mx; knob.style.transform = `translate(${dx}px,${dy}px)`; };
@@ -985,6 +994,7 @@ function update(dt) {
   if (Math.abs(life - lifeShown) > 0.004) { applyLife(life); lifeShown = life; }
   const SK0 = Rg.sky || SKY; const sk = Math.min(1, dt * 4);
   const top = SK0.topGray.clone().lerp(SK0.topLive, life), bot = SK0.botGray.clone().lerp(SK0.botLive, life);
+  EV && EV.tintSky(top, bot, inLuk);
   if (player.sight) { top.lerp(SK0.topSight, 0.6); bot.lerp(SK0.botSight, 0.5); }
   skyMat.uniforms.top.value.lerp(top, sk); skyMat.uniforms.bottom.value.lerp(bot, sk);
   scene.background.copy(skyMat.uniforms.bottom.value); scene.fog.color.copy(scene.background);
@@ -1103,11 +1113,12 @@ function update(dt) {
     const bk = smooth(0.8, 1, life);
     butterflies.forEach((b) => { b.g.visible = bk > 0.01; if (!b.g.visible) return; const t = T * 0.6 + b.ph; b.g.position.set(b.home.x + Math.sin(t) * 3, H(b.home.x, b.home.z) + 1.2 + Math.sin(t * 2.3) * 0.6, b.home.z + Math.cos(t * 0.8) * 3); b.g.rotation.y = t; const fl = Math.sin(T * 18 + b.ph) * 0.9; b.p1.rotation.y = fl; b.p2.rotation.y = -fl; b.g.scale.setScalar(bk); });
     if (ringT >= 0) { ringT += dt; const s = ringT * 28; ring.scale.setScalar(s); ring.material.opacity = Math.max(0, 0.8 - ringT * 0.27); if (ringT > 3) ringT = -1; }
-    if (life > 0.9 && Math.random() < dt * 0.25) S.bird();
+    if (life > 0.9 && Math.random() < dt * 0.25 && !(EV && EV.night() > 0.4)) S.bird();
     updateTales(dt, canMove);
     if (st.festival) updateFestival(dt);
   } else Rg.update && Rg.update(dt, canMove);
 
+  EV && EV.update(dt, inLuk);
   // камера
   const tgt = p.pos.clone().add(new THREE.Vector3(0, 1.7, 0));
   const cp = new THREE.Vector3(Math.sin(camYaw) * Math.cos(camPitch) * camDist, Math.sin(camPitch) * camDist, Math.cos(camYaw) * Math.cos(camPitch) * camDist).add(tgt);
@@ -1127,7 +1138,7 @@ function update(dt) {
   // HUD
   if (started) {
     ui.hud(p, heroLabel()); ui.tracker(trackerHtml());
-    const it = canMove ? nearest() : null; ui.prompt(it ? `F — ${it.label}` : '');
+    const it = canMove ? nearest() : null; ui.prompt(it ? (isTouch ? `✋ ${it.label}` : `F — ${it.label}`) : '');
     if (T - lastMM > 0.1) { lastMM = T; drawMinimap(); }
   }
 }
@@ -1208,6 +1219,8 @@ const ctx = {
   region: () => region, REGIONS, fade: (v) => (document.getElementById('fade').style.opacity = v), mouseBlock: () => mouseBlock || keys.has('KeyK'), V2, SKY, cat, catPet, OAK,
 };
 
+let EV = null;
+try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
 // ---------- старт ----------
 function startGame(cont) {
   S.init();
@@ -1217,7 +1230,7 @@ function startGame(cont) {
   if (!st.heroes.includes(st.hero)) st.hero = 'ivan';
   Object.values(heroes).forEach((h) => (h.root.visible = false)); player.hero = st.hero; heroes[st.hero].root.visible = true;
   life = lifeTarget = baseLife(); lifeShown = -1;
-  player.maxHp = st.turnip === 3 ? 6 : 5; player.hp = player.maxHp;
+  player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (EV ? EV.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
   applyOpt(); spawnEnemies();
   if (st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region)) { travel(st.region); } else { st.region = 'luk'; setRegion('luk'); }
@@ -1232,5 +1245,5 @@ if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont
 // фон титульного экрана: медленный облёт
 camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
-window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S, cam: { get yaw() { return camYaw; }, set yaw(v) { camYaw = v; } } };
+window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S, EV: () => EV, cam: { get yaw() { return camYaw; }, set yaw(v) { camYaw = v; } } };
 loop();

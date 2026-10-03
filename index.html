@@ -45,6 +45,7 @@
 
 <div id="settings" class="hidden">
   <div class="bookInner">
+    <button class="closeX" id="optX" title="Закрыть">✕</button>
     <h2>⚙ Настройки</h2>
     <h3>Звук</h3>
     <label>Общая громкость <input id="optMaster" type="range" min="0" max="1" step="0.05"></label>
@@ -54,6 +55,9 @@
     <label>Чувствительность мыши <input id="optSens" type="range" min="0.3" max="2.5" step="0.1"></label>
     <label><input id="optInvY" type="checkbox"> Инвертировать камеру по вертикали</label>
     <label><input id="optHelp" type="checkbox"> Подсказка по управлению</label>
+    <h3>Сказка</h3>
+    <label><input id="optVoice" type="checkbox"> Озвучка диалогов (голос браузера, если есть русский)</label>
+    <label><input id="optDay" type="checkbox"> Смена дня и ночи в Лукоморье</label>
     <h3>Графика</h3>
     <label>Качество <select id="optQuality"><option value="low">Низкое — для слабых устройств</option><option value="medium">Среднее</option><option value="high">Высокое</option></select></label>
     <label><input id="optShake" type="checkbox"> Тряска камеры при ударах</label>
@@ -65,11 +69,13 @@
 
 <div id="book" class="hidden">
   <div class="bookInner">
+    <button class="closeX" id="bookClose" title="Закрыть">✕</button>
     <h2>📖 Книга Сказов</h2>
     <p id="bookCount" class="muted"></p>
     <div id="bookList"></div>
     <h3>Забытые слова</h3>
     <div id="wordList"></div>
+    <div id="extraList"></div>
     <p class="muted">B — закрыть</p>
   </div>
 </div>

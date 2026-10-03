@@ -13,6 +13,7 @@ export const THEMES = {
   rivers: { mode: 'major', root: 2, beat: 0.27, lead: 'balalaika', drum: 1, bass: [0, 3, 4, 0], mel: [[0, 2, 4, 2, 0, 2, 4, 5], [4, 3, 2, 1, 2, -99, 0, -99], [4, 5, 7, 5, 4, 2, 4, 2], [1, 2, 3, 1, 0, -99, 0, -99]] },
   koschei: { mode: 'phryg', root: -5, beat: 0.4, lead: 'flute', drum: 2, pad: true, bass: [0, 1, 0, -2], mel: [[0, -99, 1, 0, -99, -99, -1, -99], [3, 2, 1, -99, 0, -99, -99, -99], [-99, 4, 3, 1, 0, 1, -99, -99], [0, -99, -99, -99, -1, -99, 0, -99]] },
   boss: { mode: 'phryg', root: -5, beat: 0.22, lead: 'balalaika', drum: 3, bass: [0, 0, 1, -2], mel: [[0, 1, 0, -1, 0, 3, 1, 0], [4, 3, 1, 0, 1, 0, -1, 0], [0, 1, 3, 4, 5, 4, 3, 1], [0, -99, 0, -99, 1, 0, -1, -99]] },
+  night: { mode: 'minor', root: -3, beat: 0.5, lead: 'bell', drum: 0, pad: true, bass: [0, 3, 4, 0], mel: [[4, -99, 2, -99, 4, -99, 2, -99], [4, 3, 2, 1, 2, -99, -99, -99], [2, -99, 1, -99, 2, -99, 0, -99], [1, 0, -1, 1, 0, -99, -99, -99]] }, // колыбельная «Баю-баюшки-баю»
   finale: { mode: 'major', root: 0, beat: 0.26, lead: 'balalaika', drum: 1, pad: true, bass: [0, 3, 4, 0], mel: [[0, 2, 4, 5, 4, 2, 4, 7], [5, 4, 2, 4, 2, 1, 0, -99], [4, 4, 5, 7, 5, 4, 2, 4], [2, 1, 2, 4, 0, -99, 0, -99]] },
 };
 export class Sound {
@@ -146,6 +147,7 @@ export class Sound {
   jump() { this.noise(0, 0.08, 1500, 0.05); }
   land() { this.thump(80, 0, 0.12, 0.12); this.noise(0, 0.08, 900, 0.06); }
   splash() { this.noise(0, 0.5, 1200, 0.2, 'sfx', 'bandpass'); }
+  cricket() { for (let i = 0; i < 3; i++) this.noise(i * 0.07, 0.04, 4200 + Math.random() * 600, 0.025, 'sfx', 'bandpass'); }
   owl() { [0, 0.5].forEach((t) => this.flute(f(-5), t, 0.04, 0.35, 'sfx')); this.flute(f(-7), 0.95, 0.04, 0.6, 'sfx'); }
   bird() { const b = 2000 + Math.random() * 1500; for (let i = 0; i < 3; i++) this.flute(b * (1 + i * 0.12), i * 0.08, 0.015, 0.07, 'sfx'); }
   honk() { const c = this.ctx; if (!c) return; const now = c.currentTime; const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(420, now); o.frequency.exponentialRampToValueAtTime(300, now + 0.25); const fl = c.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.value = 900; const g = c.createGain(); g.gain.setValueAtTime(0.09, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.3); o.connect(fl); fl.connect(g); g.connect(this.sfxBus); o.start(now); o.stop(now + 0.32); }
