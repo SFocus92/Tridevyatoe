@@ -5,7 +5,7 @@ export default function forest(ctx) {
   const CX = 600, CZ = 0; const V = (x, z, y = 0) => new THREE.Vector3(x, y, z);
   const group = new THREE.Group(); group.name = 'forest';
   const R = rng(77);
-  const HUT = V(CX, CZ - 6), YAGA = V(CX + 5, CZ + 3), STUMP = V(CX - 26, CZ - 20), GLADE = V(CX + 27, CZ - 24), LESHY = V(CX + 27, CZ + 22), FIRE = V(CX - 9, CZ + 30), SPAWN = V(CX, CZ + 44);
+  const HUT = V(CX, CZ - 6), YAGA = V(CX + 1.4, CZ + 8.6), /* на дорожке у калитки, а не в заборе */ STUMP = V(CX - 26, CZ - 20), GLADE = V(CX + 27, CZ - 24), LESHY = V(CX + 27, CZ + 22), FIRE = V(CX - 9, CZ + 30), SPAWN = V(CX, CZ + 44);
   const FIRS = [V(CX + 36, CZ + 30), V(CX + 21, CZ + 35), V(CX + 39, CZ + 16)];
   const zones = [[HUT, 13], [YAGA, 4], [STUMP, 6], [GLADE, 9], [LESHY, 7], [FIRE, 5], [SPAWN, 15], ...FIRS.map((f) => [f, 3])];
   const flat = (x, z) => zones.reduce((m, [p, r]) => Math.max(m, 1 - Math.min(1, Math.max(0, (Math.hypot(x - p.x, z - p.z) - r * 0.6) / (r * 0.6)))), 0);
@@ -215,6 +215,7 @@ export default function forest(ctx) {
     // избушка
     updateHut(dt, T, canMove);
   }
+  const _lp = new THREE.Vector3();
   function updateHut(dt, T, canMove) {
     const hp = hut.position; let walkAmt = 0;
     if (B.mode === 'wild' && canMove) {
@@ -234,8 +235,11 @@ export default function forest(ctx) {
       if (B.t <= 0 && !ui.busy()) { B.mode = 'wild'; B.t = 1.5; B.stomps = 0; ui.toast('Не успел! Избушка снова вскочила.'); }
     } else { body.position.y += (B.mode === 'done' ? 2.4 - body.position.y : 3.6 - body.position.y) * Math.min(1, dt * 3); if (B.mode === 'done') { const d = player.pos.clone().sub(hp); const yaw = Math.atan2(d.x, d.z); let dd = yaw - hut.rotation.y; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); hut.rotation.y += dd * dt; } }
     B.ph += dt * (walkAmt ? 7 : 1.5);
-    const crouch = (3.6 - body.position.y) / 1.8; // 0..1 приседание
-    legs.forEach((l, i) => { const s = walkAmt ? Math.sin(B.ph + i * Math.PI) * 0.5 : Math.sin(B.ph + i) * 0.05; l.hip.position.y = body.position.y; l.hip.rotation.x = s - crouch * 0.9; l.knee.rotation.x = Math.max(0, -s) * 0.8 + crouch * 1.8; });
+    // ноги по земле (двухзвенная IK: бедро 2, голень 1.6): при приседании колени сгибаются ровно настолько, чтобы лапы стояли на земле, а не уходили под неё
+    legs.forEach((l, i) => { const s = walkAmt ? Math.sin(B.ph + i * Math.PI) * 0.5 : Math.sin(B.ph + i) * 0.05; l.hip.position.y = body.position.y;
+      const w = hut.localToWorld(_lp.set(l.sx * 1.1, 0, 0)); const g = H(w.x, w.z) - hp.y + 0.14; const d = Math.min(3.58, Math.max(1.0, body.position.y - g));
+      const a = Math.acos(Math.min(1, (4 + d * d - 2.56) / (4 * d))), bend = Math.PI - Math.acos(Math.max(-1, Math.min(1, (4 + 2.56 - d * d) / 6.4)));
+      l.hip.rotation.x = s - a; l.knee.rotation.x = Math.max(0, -s) * 0.8 + bend; });
     body.rotation.z = walkAmt ? Math.sin(B.ph) * 0.05 : 0;
     hutCol.x = hp.x; hutCol.z = hp.z; ring.update(dt);
   }
