@@ -55,3 +55,26 @@ export function instanced(model, transforms, scene) {
   set(1);
   return { parts, set };
 }
+
+// Текстурированные наборы (colormap): Kenney Castle/Graveyard/Holiday/Fantasy Town/Survival/Cube Pets — всё CC0.
+// Материалы переводятся в cel-shading с сохранением текстуры; «серость» мира — шейдером (life.js).
+export async function loadKits(list, grad, lifeify, onProgress) {
+  const loader = new GLTFLoader(); const out = {}; const anims = {}; let done = 0; const cache = new Map();
+  await Promise.all(list.map(async (path) => {
+    const g = await loader.loadAsync(`assets/kits/${path}.glb`);
+    g.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      const swap = (m) => {
+        if (cache.has(m.map || m)) return cache.get(m.map || m);
+        if (m.map) { m.map.colorSpace = THREE.SRGBColorSpace; m.map.magFilter = THREE.NearestFilter; }
+        const t = lifeify(new THREE.MeshToonMaterial({ color: m.map ? 0xffffff : m.color, map: m.map || null, gradientMap: grad, transparent: m.transparent, opacity: m.opacity }));
+        cache.set(m.map || m, t); return t;
+      };
+      o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+      o.castShadow = true; o.receiveShadow = true;
+    });
+    const key = path.replace('/animal-', '/');
+    out[key] = g.scene; anims[key] = g.animations; onProgress && onProgress(++done / list.length);
+  }));
+  return { kits: out, anims };
+}

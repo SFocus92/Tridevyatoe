@@ -2,7 +2,9 @@
 import * as THREE from 'three';
 import { Sound } from './audio.js';
 import { UI } from './ui.js';
-import { loadModels, place, instanced } from './assets.js';
+import { loadModels, place, instanced, loadKits } from './assets.js';
+import { initCharacters, makeChar, skinOf } from './characters.js';
+import { uLife, lifeify, lifeifyTree } from './life.js';
 
 const S = new Sound();
 const ui = new UI();
@@ -95,9 +97,29 @@ const seaBaseY = Float32Array.from(seaGeo.attributes.position.array);
 // ---------- декор (Kenney Nature Kit, CC0, перекрашен в лубочную палитру) ----------
 const MODEL_NAMES = ['tree_pineTallA', 'tree_pineTallB', 'tree_pineRoundC', 'tree_pineDefaultA', 'tree_detailed', 'tree_default', 'tree_oak', 'tree_fat', 'tree_plateau', 'tree_simple', 'flower_purpleA', 'flower_redA', 'flower_yellowA', 'flower_yellowB', 'flower_redB', 'mushroom_red', 'mushroom_redGroup', 'mushroom_tanGroup', 'plant_bush', 'plant_bushLarge', 'plant_bushDetailed', 'grass_large', 'grass_leafs', 'rock_largeA', 'rock_largeC', 'rock_smallA', 'rock_tallB', 'stone_tallA', 'stone_largeB', 'stump_old', 'stump_round', 'log', 'log_large', 'log_stack', 'lily_large', 'lily_small', 'crop_turnip', 'campfire_stones', 'canoe', 'sign', 'crops_dirtRow', 'crops_wheatStageB', 'crops_leafsStageB'];
 const btnNew = document.getElementById('btnNew');
-const { models: MD } = await loadModels(MODEL_NAMES, toon, (k) => (btnNew.textContent = `Загрузка… ${Math.round(k * 100)}%`));
+const prog = [0, 0, 0]; const showProg = () => (btnNew.textContent = `Загрузка… ${Math.round((prog[0] * 0.25 + prog[1] * 0.55 + prog[2] * 0.2) * 100)}%`);
+const KIT_LIST = await (await fetch('assets/kits/index.json')).json();
+const [{ models: MD }, { kits: KITS, anims: KIT_ANIMS }] = await Promise.all([
+  loadModels(MODEL_NAMES, toon, (k) => { prog[0] = k; showProg(); }),
+  loadKits(KIT_LIST, grad, lifeify, (k) => { prog[1] = k; showProg(); }),
+  initCharacters(grad, (k) => { prog[2] = k; showProg(); }),
+]);
 btnNew.textContent = 'Новая сказка'; btnNew.disabled = false;
 const P = (n, x, z, s = 1, ry = srand() * 6.28, dy = 0) => place(MD, scene, n, x, H(x, z) + dy, z, s, ry);
+// экземпляр модели из текстурированного набора
+function kit(path, x, z, s = 1, ry = 0, dy = 0, parent = scene, hf = H) {
+  const src = KITS[path]; if (!src) { console.warn('нет модели', path); return new THREE.Group(); }
+  const o = src.clone(true); o.position.set(x, hf(x, z) + dy, z); o.scale.setScalar(s); o.rotation.y = ry; parent.add(o); return o;
+}
+// животное из Kenney Cube Pets с анимациями (idle, walk, run, eat, dance, gesture-positive…)
+const mixers = []; const chars = [];
+function pet(path, s = 1) {
+  const root = new THREE.Group(); const m = (KITS[path] || KITS['pets/cat']).clone(true); m.scale.setScalar(s); root.add(m);
+  const mixer = new THREE.AnimationMixer(m); const actions = {}; (KIT_ANIMS[path] || []).forEach((c) => (actions[c.name] = mixer.clipAction(c)));
+  let cur = null; const play = (n) => { const a = actions[n]; if (!a || a === cur) return; a.reset().play(); if (cur) cur.crossFadeTo(a, 0.25, false); cur = a; };
+  play('idle'); mixers.push(mixer); return { root, mixer, actions, play };
+}
+function npc(kind, opts) { const c = makeChar(kind, opts); chars.push(c); return c; }
 const colliders = []; const camBlockers = [];
 const trunkMat = toon(0x6b4423), leafA = toon(0x2f8f3a), leafB = toon(0x48a84f), birchMat = toon(0xf4f1e8), birchLeaf = toon(0x9ccc4a), birchSpot = toon(0x2a2a2a);
 function birch(x, z) {
@@ -192,31 +214,6 @@ for (let i = 0; i < 16; i++) { const a = srand() * 6.28, r = 1 + srand() * 7; pl
 const KIKI_POS = new THREE.Vector3(SWAMP.x - 4, Math.max(H(SWAMP.x - 4, SWAMP.y + 3), 0.3), SWAMP.y + 3);
 
 // ---------- персонажи ----------
-function makeIvan() {
-  const g = new THREE.Group();
-  const skin = toon(0xf2c9a0), shirt = toon(0xd63a2f), pants = toon(0x3b4f9a), boots = toon(0x5a3a22), hair = toon(0xe8c15a), belt = toon(0xf2b632), eye = toon(0x222222, {}, true);
-  const leg = (x) => { const p = new THREE.Group(); p.position.set(x, 0.8, 0); g.add(p); M(new THREE.BoxGeometry(0.24, 0.7, 0.24), pants, 0, -0.35, 0, p); M(new THREE.BoxGeometry(0.28, 0.18, 0.36), boots, 0, -0.72, 0.05, p); return p; };
-  const arm = (x) => { const p = new THREE.Group(); p.position.set(x, 1.5, 0); g.add(p); M(new THREE.BoxGeometry(0.17, 0.6, 0.17), shirt, 0, -0.3, 0, p); M(new THREE.SphereGeometry(0.11, 8, 6), skin, 0, -0.64, 0, p); return p; };
-  const legL = leg(-0.15), legR = leg(0.15), armL = arm(-0.43), armR = arm(0.43);
-  M(new THREE.CylinderGeometry(0.3, 0.38, 0.85, 10), shirt, 0, 1.2, 0, g);
-  M(new THREE.CylinderGeometry(0.385, 0.385, 0.1, 10), belt, 0, 0.86, 0, g);
-  M(new THREE.SphereGeometry(0.29, 12, 10), skin, 0, 1.88, 0, g);
-  const hc = M(new THREE.SphereGeometry(0.31, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), hair, 0, 1.92, -0.02, g); hc.scale.y = 0.8;
-  M(new THREE.SphereGeometry(0.045, 6, 6), eye, -0.1, 1.9, 0.26, g); M(new THREE.SphereGeometry(0.045, 6, 6), eye, 0.1, 1.9, 0.26, g);
-  g.userData = { legL, legR, armL, armR };
-  return g;
-}
-function makeCat() {
-  const g = new THREE.Group();
-  const fur = toon(0x55555f), belly = toon(0xe8e2d6), eyeM = toon(0xffd23f, { emissive: 0x332200 }), gold = toon(0xd9a83a);
-  const body = M(new THREE.SphereGeometry(0.5, 12, 10), fur, 0, 0.5, 0, g); body.scale.set(0.8, 0.8, 1.15);
-  M(new THREE.SphereGeometry(0.3, 10, 8), belly, 0, 0.45, 0.25, g).scale.set(0.9, 1, 0.6);
-  M(new THREE.SphereGeometry(0.36, 12, 10), fur, 0, 1.0, 0.45, g);
-  [-0.18, 0.18].forEach((x) => { const e = M(new THREE.ConeGeometry(0.11, 0.25, 4), fur, x, 1.33, 0.42, g); e.rotation.z = x > 0 ? -0.25 : 0.25; });
-  [-0.12, 0.12].forEach((x) => { M(new THREE.SphereGeometry(0.06, 8, 6), eyeM, x, 1.05, 0.76, g); const s = M(new THREE.TorusGeometry(0.09, 0.015, 6, 14), gold, x, 1.05, 0.79, g); });
-  const tail = M(new THREE.TorusGeometry(0.4, 0.07, 6, 12, Math.PI * 1.2), fur, 0, 0.8, -0.55, g); tail.rotation.y = Math.PI / 2;
-  g.userData.tail = tail; return g;
-}
 function makeMermaid() {
   const g = new THREE.Group();
   const skin = toon(0xf5d2b8), tailM = toon(0x26c2a8), hair = toon(0x3dd68c), shell = toon(0xff9ec7);
@@ -250,8 +247,10 @@ function makeForgetling() {
   g.userData.mat = mat; return g;
 }
 
-const ivan = makeIvan(); scene.add(ivan);
-const cat = makeCat(); scene.add(cat);
+const heroes = { ivan: makeChar('ivan'), vasilisa: makeChar('vasilisa'), finist: makeChar('finist') };
+Object.values(heroes).forEach((h) => { h.root.visible = false; });
+const ivan = heroes.ivan.root; ivan.visible = true;
+const catPet = pet('pets/cat', 1.25); const cat = catPet.root; scene.add(cat);
 const CAT_HOME = new THREE.Vector3(3.2, H(3.2, 3.2), 3.2); cat.position.copy(CAT_HOME); cat.rotation.y = 0.6;
 const mermaid = makeMermaid(); oak.add(mermaid); mermaid.position.set(4.3, 7.9, 0); mermaid.rotation.y = Math.PI / 2;
 const MERMAID_GROUND = new THREE.Vector3(5.5, H(5.5, 0), 0);
@@ -586,20 +585,6 @@ function outline(root, k = 1.07) {
 [ivan, cat, mermaid, kiki].forEach((g) => outline(g));
 
 // ---------- новые сказки: персонажи ----------
-function makeOldMan() {
-  const g = new THREE.Group();
-  const skin = toon(0xf0c6a0), shirt = toon(0xeae2cf), pants = toon(0x6b6b78), beard = toon(0xf7f7f2), belt = toon(0xc0392b), lapti = toon(0xc9a35a);
-  M(new THREE.BoxGeometry(0.22, 0.75, 0.22), pants, -0.14, 0.4, 0, g); M(new THREE.BoxGeometry(0.22, 0.75, 0.22), pants, 0.14, 0.4, 0, g);
-  M(new THREE.BoxGeometry(0.26, 0.14, 0.34), lapti, -0.14, 0.07, 0.04, g); M(new THREE.BoxGeometry(0.26, 0.14, 0.34), lapti, 0.14, 0.07, 0.04, g);
-  M(new THREE.CylinderGeometry(0.3, 0.42, 0.95, 10), shirt, 0, 1.25, 0, g);
-  M(new THREE.CylinderGeometry(0.43, 0.43, 0.08, 10), belt, 0, 0.86, 0, g);
-  M(new THREE.SphereGeometry(0.27, 12, 10), skin, 0, 1.92, 0, g);
-  const b = M(new THREE.ConeGeometry(0.22, 0.6, 8), beard, 0, 1.6, 0.16, g); b.rotation.x = Math.PI;
-  M(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), beard, 0, 1.97, -0.02, g);
-  [-0.45, 0.45].forEach((x) => M(new THREE.BoxGeometry(0.16, 0.6, 0.16), shirt, x, 1.3, 0.05, g));
-  const e = toon(0x222222, {}, true); M(new THREE.SphereGeometry(0.04, 6, 6), e, -0.09, 1.97, 0.24, g); M(new THREE.SphereGeometry(0.04, 6, 6), e, 0.09, 1.97, 0.24, g);
-  return g;
-}
 function makeMouse() {
   const g = new THREE.Group(); const fur = toon(0x9a9aa2), pink = toon(0xffa8b8), e = toon(0x111111, {}, true);
   M(new THREE.SphereGeometry(0.22, 10, 8), fur, 0, 0.2, 0, g).scale.set(0.9, 0.85, 1.3);
@@ -643,7 +628,7 @@ for (let r = -1; r <= 1; r++) for (let c = -2; c <= 2; c++) { if (r === 0 && c =
 const TURNIP3 = GARDEN3.clone();
 const turnip = P('crop_turnip', GARDEN.x, GARDEN.y, 6, 0, -1.6);
 colliders.push({ x: GARDEN.x, z: GARDEN.y, r: 1.2 });
-const ded = makeOldMan(); ded.position.set(GARDEN.x + 2.6, H(GARDEN.x + 2.6, GARDEN.y - 1.5), GARDEN.y - 1.5); ded.lookAt(0, ded.position.y, 0); scene.add(ded); outline(ded);
+const dedC = npc('ded'); const ded = dedC.root; ded.position.set(GARDEN.x + 2.6, H(GARDEN.x + 2.6, GARDEN.y - 1.5), GARDEN.y - 1.5); ded.lookAt(0, ded.position.y, 0); scene.add(ded);
 colliders.push({ x: ded.position.x, z: ded.position.z, r: 0.5 });
 P('sign', GARDEN.x - 5, GARDEN.y - 4, 3, 0.6);
 const mouse = makeMouse(); const MOUSE3 = new THREE.Vector3(MOUSE.x, H(MOUSE.x, MOUSE.y), MOUSE.y); mouse.position.copy(MOUSE3); scene.add(mouse);
@@ -705,7 +690,7 @@ async function pullTurnip() {
   let ok = 0;
   while (ok < 3) {
     const hit = await ui.timing(`Тянем-потянем! (${ok}/3)`, 1 + ok * 0.25);
-    if (hit) { ok++; S.pluck(220 * (1 + ok * 0.25), 0, 0.2, 0.6); turnip.position.y += 0.4; ivan.userData.armR.rotation.x = -1.4; }
+    if (hit) { ok++; S.pluck(220 * (1 + ok * 0.25), 0, 0.2, 0.6); turnip.position.y += 0.4; heroes[player.hero].once('holding-both', 'idle', 1.4); dedC.once('holding-both', 'idle', 1.4); }
     else { S.wrong(); const c = await ui.dialog(DED, 'Ух! Не в лад потянули. Ещё разок?', ['Тянем!', 'Передохнём']); if (c === 1) { turnip.position.y = H(GARDEN.x, GARDEN.y) - 1.6; return; } }
   }
   const t0 = performance.now(), y0 = turnip.position.y;
@@ -973,10 +958,9 @@ function update(dt) {
   if (st.restored) { portalMat.color.lerp(new THREE.Color(0x2f9e5a), dt); portalMat.opacity = Math.min(0.75, portalMat.opacity + dt * 0.3); swirl.material.opacity = Math.min(0.9, swirl.material.opacity + dt * 0.3); }
   mermaid.userData.tail.rotation.x = Math.sin(T * 1.6) * 0.25;
   kiki.position.y = KIKI_POS.y + Math.sin(T * 1.2) * 0.05; if (kiki.userData.giggle > 0) { kiki.userData.giggle -= dt; kiki.rotation.z = Math.sin(T * 30) * 0.08; } else kiki.rotation.z = 0;
-  cat.userData.tail.rotation.z = Math.sin(T * 2) * 0.3;
   if (st.restored && !ui.dialogOpen) {
-    const a = T * 0.35; const rr = 2.7; cat.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); cat.position.y = H(cat.position.x, cat.position.z); cat.rotation.y = -a + Math.PI;
-  } else if (!st.restored) { cat.position.copy(CAT_HOME); }
+    const a = T * 0.35; const rr = 2.7; cat.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); cat.position.y = H(cat.position.x, cat.position.z); cat.rotation.y = -a; catPet.play('walk');
+  } else { if (!st.restored) cat.position.copy(CAT_HOME); catPet.play(ui.dialogOpen && p.pos.distanceTo(cat.position) < 4 ? 'gesture-positive' : 'idle'); }
   if (ui.dialogOpen) { const d = p.pos.clone().sub(cat.position); if (d.length() < 4) cat.rotation.y = Math.atan2(d.x, d.z); }
   chainLinks.forEach((l, i) => (l.material.emissive.setHex(st.restored ? 0x553300 : 0x221100)));
 

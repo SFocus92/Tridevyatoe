@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>Персонажи — превью</title>
+<style>body{margin:0;background:#bcd}</style>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.js","three/addons/":"./vendor/addons/"}}</script>
+<script type="module">
+import * as THREE from 'three'; import { initCharacters, makeChar } from './src/characters.js';
+const q = new URLSearchParams(location.search); const kinds = (q.get('k') || 'ivan,vasilisa,finist,ded,yaga,koschei,morozko,snegurochka,leshy,alyonushka,ivanushka,ivan_false').split(',');
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); s.background = new THREE.Color(0xbcd4e6); const cam = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 100);
+s.add(new THREE.HemisphereLight(0xffffff, 0x667755, 1.3)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(3, 6, 5); s.add(d);
+const grad = new THREE.DataTexture(new Uint8Array([85, 165, 255]), 3, 1, THREE.RedFormat); grad.needsUpdate = true;
+await initCharacters(grad);
+const chs = kinds.map((k, i) => { const c = makeChar(k); c.root.position.x = (i - (kinds.length - 1) / 2) * 1.5; if (q.get('back')) c.root.rotation.y = Math.PI; s.add(c.root); c.play(q.get('a') || 'idle'); if (c.root.userData.wings) c.root.userData.wings.visible = true; return c; });
+const box = new THREE.Box3().setFromObject(chs[0].root); window.H = box.getSize(new THREE.Vector3()).y;
+cam.position.set(0, 1.2, kinds.length * 1.25 + 2); cam.lookAt(0, 0.9, 0);
+let t = 0; for (let i = 0; i < 20; i++) chs.forEach((c) => c.update(0.03));
+r.render(s, cam); window.done = true;
+</script>
