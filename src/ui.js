@@ -104,6 +104,43 @@ export class UI {
       setTimeout(() => { addEventListener('keydown', stop); box.addEventListener('pointerdown', stop); }, 250);
     });
   }
+  // мини-игра «гусли»: ноты бегут по трём струнам к золотой черте — жми 1/2/3 (или тапни струну) вовремя
+  rhythm(title, { notes = 14, speed = 1, hint = '', onNote = null } = {}) {
+    return new Promise((res) => {
+      const touch = document.body.classList.contains('touch');
+      const box = document.createElement('div'); box.id = 'rhythm';
+      box.style.cssText = 'position:fixed;left:50%;bottom:18%;transform:translateX(-50%);width:min(560px,92vw);background:rgba(30,20,12,.9);border:2px solid #e8c070;border-radius:14px;padding:12px 14px;z-index:60;color:#fff3d8;font-family:Georgia,serif;text-align:center;user-select:none';
+      box.innerHTML = `<div style="font-size:18px;margin-bottom:6px">${title}</div><div class="rl" style="position:relative;height:150px;overflow:hidden"></div><div class="rs" style="margin-top:6px;font-size:14px;opacity:.85"></div><div style="font-size:12px;opacity:.7;margin-top:2px">${touch ? 'Тапни по струне, когда нота у золотой черты' : '1 / 2 / 3 — струна, когда нота у золотой черты'}${hint ? ' · ' + hint : ''}</div>`;
+      document.body.appendChild(box); this.dialogOpen = true; document.body.classList.add('dlg');
+      const lanes = box.querySelector('.rl'), score = box.querySelector('.rs'); const COLS = ['#ffd26a', '#9fe8ff', '#ffa8c8']; const HX = 14;
+      const strs = [0, 1, 2].map((k) => { const d = document.createElement('div'); d.style.cssText = `position:absolute;left:0;right:0;top:${k * 50}px;height:50px;cursor:pointer`; d.innerHTML = `<div style="position:absolute;left:0;right:0;top:24px;height:3px;background:${COLS[k]};opacity:.55;border-radius:2px"></div><div style="position:absolute;left:4px;top:13px;font-size:15px;color:${COLS[k]}">${touch ? '' : k + 1}</div>`; lanes.appendChild(d); return d; });
+      const line = document.createElement('div'); line.style.cssText = `position:absolute;top:0;bottom:0;left:${HX}%;width:4px;margin-left:-2px;background:#ffd23f;box-shadow:0 0 10px #ffd23f`; lanes.appendChild(line);
+      const list = []; let t0 = performance.now(), hit = 0, miss = 0, done = false, gap = 0.62 / speed;
+      for (let i = 0; i < notes; i++) { const el = document.createElement('div'); const ln = (i * 7 + Math.floor(i / 3)) % 3; el.style.cssText = `position:absolute;width:26px;height:26px;margin:-13px;border-radius:50%;background:${COLS[ln]};box-shadow:0 0 8px ${COLS[ln]};top:${ln * 50 + 25}px;left:110%`; lanes.appendChild(el); list.push({ el, ln, at: 1.6 + i * gap * (i % 4 === 3 ? 1.5 : 1) + Math.floor(i / 4) * gap * 0.5, st: 0 }); }
+      const travel = 2.0 / speed; // секунд от правого края до черты
+      const xOf = (n, t) => HX + ((n.at - t) / travel) * (100 - HX);
+      const upd = () => { score.textContent = `Чисто: ${hit} · мимо: ${miss} · осталось ${list.filter((n) => !n.st).length}`; };
+      const press = (ln) => {
+        const t = (performance.now() - t0) / 1000; let best = null, bd = 9;
+        for (const n of list) if (!n.st && n.ln === ln) { const d = Math.abs(n.at - t); if (d < bd) { bd = d; best = n; } }
+        strs[ln].firstChild.style.opacity = 1; setTimeout(() => (strs[ln].firstChild.style.opacity = 0.55), 120);
+        if (best && bd < 0.2) { best.st = 1; hit++; best.el.style.transform = 'scale(1.7)'; best.el.style.opacity = 0; best.el.style.transition = 'all .25s'; onNote && onNote(ln, true); }
+        else { onNote && onNote(ln, false); }
+        upd();
+      };
+      const key = (e) => { const k = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2, KeyA: 0, KeyS: 1, KeyD: 2 }[e.code]; if (k === undefined) return; e.preventDefault(); e.stopPropagation(); if (!e.repeat) press(k); };
+      addEventListener('keydown', key, true);
+      strs.forEach((d, k) => d.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); press(k); }));
+      const tick = () => {
+        if (done) return; const t = (performance.now() - t0) / 1000;
+        for (const n of list) { if (n.st) continue; const x = xOf(n, t); n.el.style.left = x + '%'; if (n.at - t < -0.22) { n.st = 2; miss++; n.el.style.opacity = 0.15; upd(); } }
+        if (list.every((n) => n.st)) { done = true; finish(); return; }
+        requestAnimationFrame(tick);
+      };
+      const finish = () => { removeEventListener('keydown', key, true); setTimeout(() => { box.remove(); this.dialogOpen = false; document.body.classList.remove('dlg'); res(hit / notes); }, 500); };
+      upd(); requestAnimationFrame(tick);
+    });
+  }
   async say(speaker, lines) { for (const l of lines) await this.dialog(speaker, l); }
   book(st, open) {
     this.bookOpen = open; this.$('book').classList.toggle('hidden', !open);

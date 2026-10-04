@@ -6,6 +6,7 @@ import { loadModels, place, instanced, loadKits } from './assets.js';
 import { initCharacters, makeChar, skinOf } from './characters.js';
 import { uLife, lifeify, lifeifyTree } from './life.js';
 import { initEvening, RETELL } from './evening.js';
+import { initExtra } from './extra.js';
 window.__RET = RETELL;
 
 const S = new Sound();
@@ -255,8 +256,8 @@ function makeForgetling() {
   g.userData.mat = mat; return g;
 }
 
-const heroes = { ivan: makeChar('ivan'), vasilisa: makeChar('vasilisa'), finist: makeChar('finist') };
-Object.values(heroes).forEach((h) => { h.root.visible = false; scene.add(h.root); });
+const heroes = { ivan: makeChar('ivan'), vasilisa: makeChar('vasilisa'), finist: makeChar('finist'), ilya: makeChar('ilya') };
+Object.values(heroes).forEach((h) => { h.root.visible = false; h.root.rotation.order = 'YXZ'; scene.add(h.root); }); // YXZ: наклон «плывущего» героя считается после поворота
 const ivan = heroes.ivan.root; ivan.visible = true;
 const catPet = pet('pets/cat', 1.25); const cat = catPet.root; scene.add(cat);
 const CAT_HOME = new THREE.Vector3(3.2, H(3.2, 3.2), 3.2); cat.position.copy(CAT_HOME); cat.rotation.y = 0.6;
@@ -312,9 +313,10 @@ function burst(pos, color, n = 30, speed = 4, life = 1.2, size = 0.25) {
 const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe27a, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.position.set(0, OAK.y + 0.5, 0); scene.add(ring);
 let ringT = -1;
+const ringFx = (() => { const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffe9b0, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; scene.add(m); let t = -1, sp = 10; return { m, fire(pos, speed = 10) { m.position.copy(pos).setY(pos.y + 0.25); t = 0; sp = speed; }, update(dt) { if (t < 0) return; t += dt; m.scale.setScalar(0.5 + t * sp); m.material.opacity = Math.max(0, 0.85 - t * 1.6); if (t > 0.6) { t = -1; m.material.opacity = 0; } } }; })();
 
 // ---------- состояние ----------
-const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false, heroes: ['ivan'], hero: 'ivan', region: 'luk', forest: {}, mount: {}, river: {}, kosh: {}, ending: null, festival: false, turnip: 0, pike: 0, kolobok: 0, feathers: [false, false, false, false, false, false, false], stoneReads: 0 });
+const freshState = () => ({ stage: 0, links: { mermaid: false, grove: false, kiki: false }, riddle: 0, laugh: 0, groveCleared: false, restored: false, pushkin: false, words: [], book: [], seenGroveHint: false, heroes: ['ivan'], hero: 'ivan', region: 'luk', forest: {}, mount: {}, river: {}, kosh: {}, sea: {}, bridge: {}, extra: {}, ending: null, festival: false, turnip: 0, pike: 0, kolobok: 0, feathers: [false, false, false, false, false, false, false], stoneReads: 0 });
 let st = freshState();
 const save = () => localStorage.setItem(SAVE_KEY, JSON.stringify(st));
 const linkCount = () => Object.values(st.links).filter(Boolean).length;
@@ -364,7 +366,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyJ') attack();
   if (e.code === 'KeyR') ability();
   if (e.code === 'Space') jump();
-  if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') switchHero(['ivan', 'vasilisa', 'finist'][+e.code.slice(5) - 1]);
+  if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') switchHero(HERO_KEYS[+e.code.slice(5) - 1]);
   if (e.code === 'KeyH') document.getElementById('help').classList.toggle('hidden');
   if (e.code === 'KeyT') teleport();
   if (e.code === 'Space') e.preventDefault();
@@ -404,8 +406,8 @@ const orbs = [];
 function attack() {
   if (player.attackT > 0 || ui.busy() || player.locked) return;
   const hero = player.hero; const H0 = heroes[hero];
-  player.attackT = hero === 'finist' ? 0.26 : 0.38; S.swing();
-  H0.once(hero === 'vasilisa' ? 'interact-right' : 'attack-melee-right', 'idle', hero === 'finist' ? 1.7 : 1.3);
+  player.attackT = hero === 'finist' ? 0.26 : hero === 'ilya' ? 0.5 : 0.38; S.swing(); if (hero === 'ilya') S.thump && S.thump(90, 0.12, 0.2, 0.2);
+  H0.once(hero === 'vasilisa' ? 'interact-right' : 'attack-melee-right', 'idle', hero === 'finist' ? 1.7 : hero === 'ilya' ? 1.05 : 1.3);
   const fwd = new THREE.Vector3(Math.sin(player.facing), 0, Math.cos(player.facing));
   if (hero === 'vasilisa') { // волшебный огонёк-клубок: летит к ближайшей цели впереди
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), new THREE.MeshBasicMaterial({ color: 0x9fe8ff }));
@@ -418,12 +420,12 @@ function attack() {
     const v = tgt ? tgt.clone().sub(m.position).normalize().multiplyScalar(18) : fwd.clone().multiplyScalar(18);
     orbs.push({ m, v, t: 0, tgt }); S.magic(); return;
   }
-  let hitAny = false; const reach = hero === 'finist' ? 3.2 : 2.8;
+  let hitAny = false; const reach = hero === 'finist' ? 3.2 : hero === 'ilya' ? 3.3 : 2.8;
   for (const e of enemies) {
     if (!e.alive || !e.g.parent?.visible) continue;
     const d = e.g.position.clone().sub(player.pos); const dy = Math.abs(d.y); d.y = 0;
     if (d.length() < reach + (e.big || 0) && dy < 4 + (e.big || 0) && d.normalize().dot(fwd) > 0.2) {
-      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1) * (hero === 'ivan' ? 1.5 : 1) * (player.dmgK || 1);
+      const dmg = (player.buffT > 0 ? 3 : 1) * (player.sight ? 2 : 1) * (hero === 'ivan' ? 1.5 : hero === 'ilya' ? 2 : 1) * (player.dmgK || 1);
       if (hurtEnemy(e, dmg, player.pos)) hitAny = true;
     }
   }
@@ -454,15 +456,23 @@ function ability() {
     player.hp = Math.min(player.maxHp, player.hp + 2); player.word = Math.min(100, player.word + 40); player.luckCd = 30; S.magic(); heroes.vasilisa.once('emote-yes');
     burst(player.pos.clone().setY(player.pos.y + 1.4), 0x9fe8ff, 40, 4, 1);
     const [, txt] = objective(); ui.toast('📘 Премудрость: +2 ❤, +Слово. Подсказка: ' + txt, false, 4500);
+  } else if (h === 'ilya') { // богатырский удар: булавой оземь — забудок вокруг раскидывает
+    player.luckCd = 14; heroes.ilya.once('attack-melee-right', 'idle', 0.9); S.stomp(); shake(0.5); ringFx.fire(player.pos, 14);
+    burst(player.pos.clone().setY(player.pos.y + 0.3), 0xd8d0c0, 50, 7, 0.9, 0.25);
+    let n = 0; enemies.forEach((e) => { if (!e.alive || !e.g.parent?.visible) return; const d = e.g.position.clone().sub(player.pos); d.y = 0; if (d.length() < 7 + (e.big || 0)) { e.kb.copy(d.normalize()).multiplyScalar(18); if (hurtEnemy(e, 3 * (player.sight ? 2 : 1), player.pos)) n++; } });
+    for (const hh of hittables) { if (hh.cond && !hh.cond()) continue; const q = hh.pos(); if (Math.hypot(q.x - player.pos.x, q.z - player.pos.z) < 6 && Math.abs(q.y - player.pos.y) < 4 && hh.heavy) hh.onHit('ilya'); }
+    ui.toast(n ? `💪 Богатырский удар! Раскидал ${n}` : '💪 Богатырский удар! Земля дрогнула', false, 1800);
   } else if (h === 'finist') { player.dashT = 0.28; player.luckCd = 3.5; S.dash(); burst(player.pos.clone().setY(player.pos.y + 1), 0xffe0a0, 20, 3, 0.5); player.vy = Math.max(player.vy, 3); }
 }
 function heroLabel() {
   const h = player.hero; const cd = player.luckCd;
-  const nm = h === 'ivan' ? '🍀 R — Удача дурака' : h === 'vasilisa' ? '📘 R — Премудрость' : '🦅 R — рывок · Пробел×2 — полёт';
+  const nm = h === 'ivan' ? '🍀 R — Удача дурака' : h === 'vasilisa' ? '📘 R — Премудрость' : h === 'ilya' ? '💪 R — Богатырский удар' : '🦅 R — рывок · Пробел×2 — полёт';
   return `${HERO_NAME[h]} · ${cd <= 0 ? nm + ': готово' : nm.replace(/R — /, '') + ': ' + Math.ceil(cd) + ' с'}`;
 }
 function jump() {
   const p = player; if (ui.busy() || p.locked) return;
+  if (region.swim) { if (p.strokeT > 0) return; p.strokeT = 0.35; p.vy = Math.max(p.vy, 5.5); p.onGround = false; S.splash(); burst(p.pos.clone().setY(p.pos.y + 1), 0xcff4ff, 8, 1.5, 0.6, 0.12); return; } // под водой — гребок вверх
+  if (p.ride && p.onGround) { p.vy = 12.5; p.onGround = false; p.jumps = 2; S.stomp(); return; }
   if (p.onGround) { p.vy = p.hero === 'finist' ? 10 : 9; p.onGround = false; p.jumps = 1; S.jump(); }
   else if (p.hero === 'finist' && p.jumps < 2) { p.vy = 11; p.jumps = 2; S.dash(); burst(p.pos.clone().setY(p.pos.y + 1), 0xffe0a0, 14, 3, 0.5); }
 }
@@ -613,7 +623,7 @@ async function fireTalk() {
 }
 async function portalTalk() {
   if (!st.restored) { await ui.say(IVAN, ['Каменная арка. Внутри — серая муть. Нить Лукоморья порвана, дальше дороги нет.']); return; }
-  const opts = [['forest', '🌲 Дремучий лес — избушка Бабы-Яги', true], ['mount', '🏔 Ледяные горы — царство Морозко', st.forest.done], ['river', '🌊 Молочные реки — гуси-лебеди', st.mount.done], ['kosh', '💀 Царство Кощея Бессмертного', st.river.done]];
+  const opts = [['forest', '🌲 Дремучий лес — избушка Бабы-Яги', true], ['mount', '🏔 Ледяные горы — царство Морозко', st.forest.done], ['river', '🌊 Молочные реки — гуси-лебеди', st.mount.done], ['kosh', '💀 Царство Кощея Бессмертного', st.river.done], ['sea', '🐚 Морское царство — Садко и Морской царь', st.restored && st.sea.met], ['bridge', '🔥 Калинов мост — река Смородина', st.sea.done && st.mount.done]];
   const open = opts.filter((o) => o[2] && CHAPTER_READY.has(o[0]));
   if (!open.length) { await ui.say('Портал', ['Из арки тянет хвоей и дымом. Где-то далеко скрипят куриные ноги избушки…', 'Дорога в Дремучий лес ещё не проложена. (Продолжение — в следующей версии.)']); return; }
   const c = await ui.dialog('Портал', 'Из арки тянет ветрами всех сказок. Куда шагнуть?', [...open.map((o) => o[1]), 'Остаться в Лукоморье']);
@@ -793,9 +803,14 @@ async function teleport() {
   if (!st.pike) { ui.toast('Волшебных слов ты пока не знаешь…'); return; }
   if (ui.busy() || player.locked) return;
   document.exitPointerLock(); player.locked = true;
-  const list = region === LUK ? TP : [...(region.tp || []), ['Домой, в Лукоморье', null]];
+  const list = region === LUK ? [...TP, ...(XT ? XT.tp() : [])] : [...(region.tp || []), ['Домой, в Лукоморье', null]];
+  if (st.extra && st.extra.carpet) { // ковёр-самолёт Царевны-лягушки: в любой открытый край
+    const fly = [['forest', '🌲 Дремучий лес', st.restored], ['mount', '🏔 Ледяные горы', st.forest.done], ['river', '🌊 Молочные реки', st.mount.done], ['kosh', '💀 Царство Кощея', st.river.done], ['sea', '🐚 Морское царство', st.sea.met], ['bridge', '🔥 Калинов мост', st.sea.done && st.mount.done]];
+    fly.forEach(([id, nm, ok]) => { if (ok && region.id !== id) list.push([`🧞 Ковёр-самолёт → ${nm}`, 'region:' + id]); });
+  }
   const c = await ui.dialog('По щучьему велению', 'По щучьему велению, по моему хотению — хочу оказаться…', [...list.map((t) => t[0]), 'Остаться здесь']);
   if (c >= 0 && c < list.length) {
+    if (typeof list[c][1] === 'string') { player.locked = false; await travel(list[c][1].slice(7)); return; }
     if (!list[c][1]) { player.locked = false; await travel('luk', new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4)); return; }
     const fade = document.getElementById('fade'); fade.style.opacity = 1; S.chime(); await wait(700);
     player.pos.copy(list[c][1]()); player.pos.y = groundH(player.pos.x, player.pos.z); player.vy = 0; camera.position.copy(player.pos).add(new THREE.Vector3(0, 4, 8));
@@ -835,6 +850,7 @@ function lukObjective() {
   if (!st.river.done) return [PORTAL3, 'через портал — к Молочным рекам'];
   if (!st.kosh.done) return [PORTAL3, 'через портал — в царство Кощея'];
   if (!st.finalTale) return [cat.position, 'к коту — сказка рассказана! Послушай его'];
+  const xo = XT && XT.objective(); if (xo) return xo;
   return [cat.position, 'сказка рассказана! Гуляй по Тридевятому — или начни новую'];
 }
 async function koloTalk() { const [, txt] = objective(); await ui.say(KOLO, [`Покатили ${txt}! Я впереди.`]); }
@@ -981,7 +997,7 @@ if (isTouch) {
 }
 
 // ---------- трекер ----------
-const BOOK_TOTAL = 13, WORDS_TOTAL = 7; ui.totals = { book: BOOK_TOTAL, words: WORDS_TOTAL };
+const BOOK_TOTAL = 20, WORDS_TOTAL = 9; ui.totals = { book: BOOK_TOTAL, words: WORDS_TOTAL };
 function trackerHtml() {
   if (region !== LUK) return region.tracker() + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
   const ck = (b) => (b ? '☑' : '☐');
@@ -992,7 +1008,7 @@ function trackerHtml() {
   else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>${st.festival ? '🎉 Праздник! ' + (st.finalTale ? 'Сказка рассказана' : 'Послушай кота') : st.kosh.done ? '• Сказка почти рассказана' : '• Портал проснулся — шагни в него'}`;
   if (st.stage >= 1) {
     const nf = st.feathers.filter(Boolean).length;
-    h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7`;
+    h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7` + (XT ? XT.tracker() : '');
   }
   return h + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
 }
@@ -1027,7 +1043,7 @@ function update(dt) {
     if (keys.has('KeyW') || keys.has('ArrowUp')) iz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
     if (joy.id !== null) { ix += joy.x; iz += joy.y; }
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.85;
-    speed = (run ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1) * (p.hero === 'finist' ? 1.08 : 1) * (p.slow > 0 ? 0.6 : 1);
+    speed = (run ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1) * (p.hero === 'finist' ? 1.08 : p.hero === 'ilya' ? 0.94 : 1) * (p.slow > 0 ? 0.6 : 1) * (p.ride ? 1.75 : 1) * (Rg.swim && !p.onGround ? 0.9 : 1);
     if (p.dashT > 0) speed = 26;
     if (ix || iz || p.dashT > 0) {
       let dx, dz;
@@ -1041,10 +1057,15 @@ function update(dt) {
   for (const c of colliders) { if (Math.abs(p.pos.x - c.x) > 6 || Math.abs(p.pos.z - c.z) > 6) continue; if (c.h !== undefined && p.pos.y > c.h) continue; const dx = p.pos.x - c.x, dz = p.pos.z - c.z, d = Math.hypot(dx, dz), m = c.r + 0.4; if (d < m && d > 0.0001) { p.pos.x = c.x + (dx / d) * m; p.pos.z = c.z + (dz / d) * m; } }
   { const cx = p.pos.x - Rg.center.x, cz = p.pos.z - Rg.center.y, r = Math.hypot(cx, cz); if (r > Rg.radius) { p.pos.x = Rg.center.x + (cx * Rg.radius) / r; p.pos.z = Rg.center.y + (cz * Rg.radius) / r; } }
   const gh = Math.max(groundH(p.pos.x, p.pos.z), Rg.water === false ? -99 : 0.05);
-  const gliding = p.hero === 'finist' && !p.onGround && keys.has('Space') && p.vy < 0 && canMove;
-  p.vy -= (gliding ? 6 : 26) * dt; if (gliding) p.vy = Math.max(p.vy, -1.8);
+  const gliding = p.hero === 'finist' && !p.onGround && keys.has('Space') && p.vy < 0 && canMove && !Rg.swim && !p.ride;
+  p.strokeT = Math.max(0, (p.strokeT || 0) - dt);
+  if (Rg.swim) { // плавание: вода держит, Пробел — гребок вверх (держи — всплываешь), отпусти — медленно опускаешься
+    p.vy -= 5 * dt; if (keys.has('Space') && canMove) p.vy = Math.min(p.vy + 16 * dt, 4.5);
+    p.vy = Math.min(6, Math.max(-3.2, p.vy)); p.vy *= Math.pow(0.6, dt);
+  } else { p.vy -= (gliding ? 6 : 26) * dt; if (gliding) p.vy = Math.max(p.vy, -1.8); }
   p.pos.y += p.vy * dt;
-  if (p.pos.y <= gh) { if (!p.onGround && p.vy < -8) { S.land(); burst(p.pos.clone(), 0xd8d0c0, 8, 2, 0.4, 0.15); } p.pos.y = gh; p.vy = 0; p.onGround = true; p.jumps = 0; } else if (p.pos.y > gh + 0.05) p.onGround = false;
+  if (Rg.swim && p.pos.y > Rg.swimTop) { p.pos.y = Rg.swimTop; p.vy = Math.min(p.vy, 0); }
+  if (p.pos.y <= gh) { if (!p.onGround && p.vy < -8 && !Rg.swim) { S.land(); burst(p.pos.clone(), 0xd8d0c0, 8, 2, 0.4, 0.15); } p.pos.y = gh; p.vy = 0; p.onGround = true; p.jumps = 0; } else if (p.pos.y > gh + 0.05) p.onGround = false;
   if (gliding && Math.random() < dt * 20) burst(p.pos.clone().setY(p.pos.y + 1.2), 0xffe0a0, 1, 0.5, 0.6, 0.12);
   p.attackT = Math.max(0, p.attackT - dt); p.hurtT = Math.max(0, p.hurtT - dt); p.buffT = Math.max(0, p.buffT - dt); p.speedT = Math.max(0, p.speedT - dt); p.luckCd = Math.max(0, p.luckCd - dt);
   p.dashT = Math.max(0, p.dashT - dt); p.hidden = Math.max(0, p.hidden - dt); p.slow = Math.max(0, p.slow - dt);
@@ -1056,9 +1077,11 @@ function update(dt) {
 
   // герой: позиция и анимация
   const hr = hero.root; hr.position.copy(p.pos); hr.rotation.y = p.facing; hr.scale.setScalar(p.buffT > 0 ? 1.15 : 1);
+  const swimming = Rg.swim && !p.onGround; hr.rotation.x += ((swimming ? (moving ? 1.05 : 0.25) : 0) - hr.rotation.x) * Math.min(1, dt * 6); if (swimming) hr.position.y += moving ? 0.6 : 0.15;
+  if (p.ride) hr.position.y += 0.95;
   hr.visible = !(p.hidden > 0 && p.hiddenModel);
-  if (!hero._busy) hero.play(!p.onGround ? (gliding ? 'holding-both' : 'sprint') : blocking ? 'holding-both' : moving ? (speed > 8 ? 'sprint' : 'walk') : 'idle');
-  const anim = hero.cur; if (anim) anim.timeScale = !p.onGround && !gliding ? 0.4 : moving ? Math.max(0.8, speed / 7) : 1;
+  if (!hero._busy) hero.play(p.ride ? 'sit' : swimming ? (moving ? 'walk' : 'idle') : !p.onGround ? (gliding ? 'holding-both' : 'sprint') : blocking ? 'holding-both' : moving ? (speed > 8 ? 'sprint' : 'walk') : 'idle');
+  const anim = hero.cur; if (anim) anim.timeScale = swimming ? (moving ? 0.55 : 0.6) : !p.onGround && !gliding ? 0.4 : moving ? Math.max(0.8, speed / 7) : 1;
   if (hr.userData.wings) { const w = hr.userData.wings; w.visible = gliding || p.dashT > 0 || (!p.onGround && p.jumps >= 2); w.children.forEach((c) => (c.rotation.z = c.userData.s * (gliding ? Math.sin(T * 3) * 0.12 : Math.sin(T * 18) * 0.5))); }
   if (hr.userData.braid) hr.userData.braid.rotation.x = moving ? 0.25 + Math.sin(T * 10) * 0.08 : 0.05;
   hero.update(dt);
@@ -1094,6 +1117,7 @@ function update(dt) {
     for (const h of hittables) { if (hit || (h.cond && !h.cond())) continue; const hp = h.pos(); if (hp.distanceTo(o.m.position) < (h.r || 3)) { h.onHit('vasilisa'); hit = true; } }
     if (hit) { burst(o.m.position, 0x9fe8ff, 16, 3, 0.5, 0.2); scene.remove(o.m); orbs.splice(i, 1); }
   }
+  ringFx.update(dt);
   // море следует за игроком
   sea.position.x = Math.round(p.pos.x / 10) * 10; sea.position.z = Math.round(p.pos.z / 10) * 10;
   const sp = seaGeo.attributes.position; for (let i = 0; i < sp.count; i++) { const x = seaBaseY[i * 3] + sea.position.x, z = seaBaseY[i * 3 + 2] + sea.position.z; sp.setY(i, Math.sin(x * 0.12 + T * 1.3) * 0.15 + Math.cos(z * 0.1 + T) * 0.15); }
@@ -1132,6 +1156,7 @@ function update(dt) {
     updateTales(dt, canMove);
     if (st.festival) updateFestival(dt);
   } else Rg.update && Rg.update(dt, canMove);
+  XT && XT.update(dt, canMove, inLuk);
 
   EV && EV.update(dt, inLuk);
   // камера
@@ -1161,7 +1186,8 @@ let loopErr = 0;
 function loop() { requestAnimationFrame(loop); const dt = Math.min(0.05, clock.getDelta()); try { update(dt); } catch (e) { if (loopErr++ < 5) console.error('update', e); } renderer.render(scene, camera); }
 
 // ---------- регионы (острова Тридевятого) ----------
-const HERO_NAME = { ivan: 'Иван', vasilisa: 'Василиса Премудрая', finist: 'Финист — Ясный Сокол' };
+const HERO_NAME = { ivan: 'Иван', vasilisa: 'Василиса Премудрая', finist: 'Финист — Ясный Сокол', ilya: 'Илья Муромец' };
+const HERO_KEYS = ['ivan', 'vasilisa', 'finist', 'ilya'];
 const lukGroup = new THREE.Group(); lukGroup.name = 'luk';
 { const keepSet = new Set([hemi, sun, sun.target, skyDome, sea, ...Object.values(heroes).map((h) => h.root)]);
   [...scene.children].forEach((o) => { if (!keepSet.has(o)) lukGroup.add(o); }); scene.add(lukGroup); }
@@ -1169,8 +1195,8 @@ function lukSurface(x, z) { if (Math.hypot(x - SWAMP.x, z - SWAMP.y) < 9) return
 const LUK = { id: 'luk', name: 'Лукоморье', center: V2(0, 0), radius: 52, H, group: lukGroup, music: 'luk', sky: SKY, fogNear: 45, fogFar: 170, amb: { wind: 0.03, water: 0.06 }, spawn: () => new THREE.Vector3(FIRE.x + 2, 0, FIRE.y + 2.5) };
 const REGIONS = { luk: LUK };
 const CHAPTERS = {};
-for (const id of ['forest', 'mount', 'river', 'kosh']) CHAPTERS[id] = `./chapters/${id}.js`;
-const CHAPTER_READY = new Set(['forest', 'mount', 'river', 'kosh']);
+for (const id of ['forest', 'mount', 'river', 'kosh', 'sea', 'bridge']) CHAPTERS[id] = `./chapters/${id}.js`;
+const CHAPTER_READY = new Set(['forest', 'mount', 'river', 'kosh', 'sea', 'bridge']);
 let region = LUK; const groundH = (x, z) => region.H(x, z);
 let lifeOverride = null, camOverride = null, lastMM = 0, festivalUpd = null;
 function updateFestival(dt) { festivalUpd && festivalUpd(dt); }
@@ -1184,10 +1210,10 @@ function setRegion(id) {
 async function ensureRegion(id) {
   if (REGIONS[id]) return REGIONS[id];
   const mod = await import(CHAPTERS[id]); const R = mod.default(ctx);
-  R.group.visible = false; scene.add(R.group); REGIONS[id] = R; R.init && R.init(); return R;
+  R.group.visible = false; scene.add(R.group); REGIONS[id] = R; R.init && R.init(); try { XT && XT.onRegion(id, R); } catch (e) { console.error('extra', e); } return R;
 }
 async function travel(id, pos) {
-  const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic();
+  const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic(); XT && XT.dismount && XT.dismount(true);
   await wait(650);
   let R; try { R = await ensureRegion(id); } catch (e) { console.error(e); ui.toast('Эта сказка ещё не написана…'); fade.style.opacity = 0; player.locked = wasLocked; return; }
   setRegion(id);
@@ -1209,7 +1235,7 @@ function switchHero(k) {
 }
 function unlockHero(k) {
   if (st.heroes.includes(k)) return; st.heroes.push(k); save(); S.fanfare();
-  ui.toast(`${HERO_NAME[k]} теперь с тобой! Клавиша ${['ivan', 'vasilisa', 'finist'].indexOf(k) + 1} (или 👥) — сменить героя.`, true, 5000);
+  ui.toast(`${HERO_NAME[k]} теперь с тобой! Клавиша ${HERO_KEYS.indexOf(k) + 1} (или 👥) — сменить героя.`, true, 5000);
 }
 // рельеф для глав: сетка с цветами вершин, обесцвечивается шейдером «жизни»
 function makeTerrain(cx, cz, size, seg, Hf, colorFn, parent) {
@@ -1232,10 +1258,12 @@ const ctx = {
   T: () => T, life: () => life, lifeify, lifeifyTree, uLife, objective: () => objective(), makeTerrain, spawnEnemy, removeEnemies, lockPlayer: (v) => (player.locked = v),
   setLifeOverride: (v) => (lifeOverride = v), setCam: (v) => (camOverride = v), setFestival: (f) => (festivalUpd = f), outline, HERO_NAME, PORTAL3, LUK_PORTAL_POS: () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4),
   region: () => region, REGIONS, fade: (v) => (document.getElementById('fade').style.opacity = v), mouseBlock: () => mouseBlock || keys.has('KeyK'), V2, SKY, cat, catPet, OAK,
+  makeMermaid, makePike, lukH: H, MERMAID_GROUND, KIKI_POS, STONE3, FIRE3, PIKE3, mermaid, kiki, burstAt: burst, HERO_KEYS, nightTales: () => (st.nightTales || []), night: () => (EV ? EV.night() : 0), ringFx, teleport: () => teleport(), EV: () => EV, XT: () => XT,
 };
 
-let EV = null;
+let EV = null, XT = null;
 try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS, FIREBIRD_SEAT: FIREBIRD_SEAT.clone().add(OAK) }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
+try { XT = initExtra(ctx); } catch (e) { console.error('extra', e); XT = null; }
 // ---------- старт ----------
 function startGame(cont) {
   S.init();
@@ -1243,9 +1271,10 @@ function startGame(cont) {
   else { st = freshState(); save(); }
   if (st.restored) GAPS.forEach((g) => (chainLinks[g].visible = true));
   if (!st.heroes.includes(st.hero)) st.hero = 'ivan';
+  st.sea ||= {}; st.bridge ||= {}; st.extra ||= {};
   Object.values(heroes).forEach((h) => (h.root.visible = false)); player.hero = st.hero; heroes[st.hero].root.visible = true;
   life = lifeTarget = baseLife(); lifeShown = -1;
-  player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (EV ? EV.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
+  player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (st.heroes.includes('ilya') ? 1 : 0) + (EV ? EV.hpBonus() : 0) + (XT ? XT.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
   applyOpt(); spawnEnemies();
   if (st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region)) { travel(st.region); } else { st.region = 'luk'; setRegion('luk'); }

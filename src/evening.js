@@ -25,6 +25,15 @@ export const RETELL = {
   'Сивка-Бурка': ['Как позвать Сивку-Бурку?', '«Встань передо мной, как лист перед травой!»', '«Но, лошадка, вперёд!»', '«Сим-сим, откройся»'],
   'Царевна-лягушка': ['Кем обернулась лягушка?', 'Василисой Премудрой', 'Бабой-Ягой', 'Снегурочкой'],
   'Лиса и журавль': ['Чем лиса угостила журавля?', 'Кашей, размазанной по тарелке', 'Пирогами', 'Окрошкой в кувшине'],
+  'Морозко и две сестры': ['Чем наградил Морозко добрую падчерицу?', 'Шубой и сундуком с приданым', 'Ледяной короной', 'Ничем'],
+  'Двенадцать месяцев': ['Кто помог падчерице найти фиалки зимой?', 'Братья-месяцы у костра', 'Морозко', 'Баба-Яга'],
+  'Садко': ['На чём играл Садко Морскому царю?', 'На гуслях', 'На балалайке', 'На дудочке'],
+  'Чудо-юдо Рыба-кит': ['Что разбудило Рыбу-кита?', 'Сказитель разбил ракушки-забудки', 'Громкая песня', 'Щекотка'],
+  'Сказка о рыбаке и рыбке': ['Что первым попросила старуха у рыбки?', 'Новое корыто', 'Терем', 'Стать царицей'],
+  'Сивка-Бурка, вещая каурка': ['С какой попытки конь допрыгнул до окошка царевны?', 'С третьей', 'С первой', 'С десятой'],
+  'Царевна-лягушка и ковёр-самолёт': ['Почему не надо было жечь лягушачью кожу?', 'Чудо нельзя торопить', 'Она красивая', 'Её можно продать'],
+  'Илья Муромец': ['Что подняло Илью Муромца на ноги?', 'Живая вода', 'Горячий чай', 'Звон колоколов'],
+  'Змей Горыныч и Калинов мост': ['Кем оказался Змей Горыныч?', 'Стражем Калинова моста', 'Разбойником', 'Кощеевым братом'],
 };
 
 // обереги, которые мастерят герои, когда доверие дорастает до 2
@@ -94,6 +103,22 @@ export const NIGHT_TALES = [
     { ask: 'Что натворил Иван, пока Василиса плясала?', right: 'Сжёг лягушачью кожу', wrong: ['Спрятал кожу в сундук', 'Отдал кожу царю'], act: 'burn', after: 'И пропала Василиса: «Ищи меня за тридевять земель, в царстве Кощея Бессмертного…»' },
     { ask: 'Чем кончилась сказка?', right: 'Иван нашёл Василису и одолел Кощея', wrong: ['Василиса осталась лягушкой', 'Иван про неё забыл'], act: 'dance', after: 'Добрые звери помогли ему, достал он Кощееву смерть — и вернулся домой с Василисой. Тут и сказке конец!' },
   ] },
+  { id: 'morozko2', title: 'Морозко и две сестры', moral: 'Мур. Доброе слово и терпение греют лучше любой шубы.', steps: [
+    { say: 'Жила-была мачеха, и было у неё две девушки: падчерица — работящая да добрая, и родная дочка — ленивая да капризная.', show: ['girl', 'sister'] },
+    { say: 'Невзлюбила мачеха падчерицу и велела старику отвезти её в зимний лес и оставить под ёлкой.', show: ['sled', 'fir'], hide: ['sister'] },
+    { ask: 'Пришёл Морозко, потрескивает, пощёлкивает: «Тепло ли тебе, девица?» Что ответила падчерица?', right: '«Тепло, Морозушко, тепло, батюшка»', wrong: ['«Холодно! Уходи!»', 'Ничего не ответила'], show: ['morozko'], after: 'Пожалел её Морозко, укутал в шубу, одарил сундуком с приданым.' },
+    { ask: 'Что увидел старик, когда приехал за дочкой?', right: 'Румяную девицу в шубе, с сундуком', wrong: ['Ледяную статую', 'Пустую поляну'], show: ['chest'], after: 'Обрадовался старик, привёз падчерицу домой. А собачка под столом тявкает: «Тяф-тяф! Стариковой дочке в золоте ходить!»' },
+    { ask: 'Позавидовала мачеха и отправила в лес родную дочку. Что та ответила Морозко?', right: '«Убирайся, мне и так холодно!»', wrong: ['«Тепло, батюшка»', 'Спела ему песенку'], show: ['sister'], hide: ['girl', 'chest'], after: 'Рассердился Морозко — и не дал ей ни шубы, ни сундука. Вернулась она домой ни с чем, дрожа от холода.' },
+    { ask: 'Чему научилась мачехина дочка?', right: 'Что грубостью добра не получишь', wrong: ['Что Морозко злой', 'Что в лес ходить нельзя'], act: 'dance', after: 'С той поры, говорят, и она стала вежливой. А падчерица вышла замуж и жила припеваючи.' },
+  ] },
+  { id: 'months', title: 'Двенадцать месяцев', moral: 'Мур. Всему своё время: кто чтит порядок мира, тому и мир поможет.', steps: [
+    { say: 'Посреди зимы, в лютый январь, злая мачеха послала падчерицу в лес: «Принеси фиалок — не вернёшься без них!»', show: ['girl', 'fir'] },
+    { say: 'Шла девочка по сугробам и увидела на поляне большой костёр, а вокруг сидят двенадцать братьев — двенадцать месяцев.', show: ['months'] },
+    { ask: 'Кто из братьев взял посох и уступил место весне?', right: 'Старший брат Январь — передал посох Марту', wrong: ['Самый младший — Декабрь', 'Никто не уступил'], act: 'spring', after: 'Махнул Март посохом — растаял снег, и на поляне расцвели фиалки!' },
+    { ask: 'Потом мачеха потребовала земляники. Какой месяц помог?', right: 'Июнь', wrong: ['Февраль', 'Ноябрь'], show: ['berries'], after: 'Июнь махнул посохом — и поляна покраснела от земляники. А потом Сентябрь дал ей румяных яблок.' },
+    { ask: 'Мачеха с дочкой сами пошли к костру и грубо потребовали всего сразу. Что случилось?', right: 'Январь махнул рукавом — и началась метель', wrong: ['Месяцы подарили им лето', 'Они нашли сундук'], act: 'snow', after: 'Замело их метелью, долго плутали они по лесу и вернулись домой — притихшие и уже не такие сердитые.' },
+    { ask: 'А что получила падчерица?', right: 'Месяцы стали ей друзьями и каждую весну приходили в гости', wrong: ['Ничего', 'Корону'], act: 'dance', after: 'С тех пор у её крыльца первыми в округе распускаются цветы. Вот и сказке конец.' },
+  ] },
 ];
 export const NIGHT_TOTAL = NIGHT_TALES.length;
 
@@ -161,9 +186,14 @@ export function initEvening(c, X) {
     bunny: () => c.pet('pets/bunny', 0.75).root, fox: () => c.pet('pets/fox', 0.85).root,
     wolf: () => tint(c.pet('pets/dog', 0.95).root, 0x9aa0aa), dog: () => c.pet('pets/dog', 0.85).root,
     bear: () => tint(c.pet('pets/hog', 1.5).root, 0x8a5a33), bull: () => c.pet('pets/cow', 1.0).root,
+    girl: () => c.npc('alyonushka', { scale: 0.5 }).root, sister: () => c.npc('ivan_false', { scale: 0.5 }).root, morozko: () => c.npc('morozko', { scale: 0.6 }).root,
+    sled: () => c.kit('holiday/sled', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0), chest: () => c.kit('survival/chest', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0),
+    fir: () => { const g = new THREE.Group(); const t = c.kit('holiday/tree-snow-a', 0, 0, 2.2, 0, 0, g, () => 0); return g; },
+    months: () => { const g = new THREE.Group(); const f = blob(0xff8a2a, 0.5, 0.7, 0.5); f.material = new THREE.MeshBasicMaterial({ color: 0xffa040 }); f.position.y = 0.35; g.add(f); const cols = [0xbfe6ff, 0xbfe6ff, 0x9ae86a, 0x9ae86a, 0x9ae86a, 0xffd23f, 0xffd23f, 0xffd23f, 0xe39b3a, 0xe39b3a, 0xe39b3a, 0xbfe6ff]; for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; const m = blob(cols[i], 0.28, 0.6, 0.28); m.position.set(Math.cos(a) * 1.1, 0.3, Math.sin(a) * 1.1); g.add(m); const h = blob(0xf2c49b, 0.2, 0.2, 0.2); h.position.set(Math.cos(a) * 1.1, 0.72, Math.sin(a) * 1.1); g.add(h); } g.userData.months = true; return g; },
+    berries: () => { const g = new THREE.Group(); for (let i = 0; i < 9; i++) { const m = blob(0xe0302a, 0.14, 0.14, 0.14); m.position.set((Math.random() - 0.5) * 0.9, 0.12, (Math.random() - 0.5) * 0.9); g.add(m); } return g; },
     hen: () => c.pet('pets/chick', 1.0).root, rooster: () => tint(c.pet('pets/chick', 1.25).root, 0xff8a6a),
   };
-  const SLOT = { tower: [0.4, 0, -1.6], ring: [0, 0, 0.6], arrow: [-0.4, 0, 0.6], loaf: [0.5, 0, 0.5], terem: [0, 0, -1.2], hut: [1.4, 0, -1.2], iceHut: [-1.5, 0, -1.2], goldEgg: [0, 0, 0.3], egg: [0.5, 0, 0.3], plate: [0, 0, 0.5], jug: [0.6, 0, 0.5] };
+  const SLOT = { tower: [0.4, 0, -1.6], ring: [0, 0, 0.6], arrow: [-0.4, 0, 0.6], loaf: [0.5, 0, 0.5], terem: [0, 0, -1.2], hut: [1.4, 0, -1.2], iceHut: [-1.5, 0, -1.2], goldEgg: [0, 0, 0.3], egg: [0.5, 0, 0.3], plate: [0, 0, 0.5], jug: [0.6, 0, 0.5], months: [0, 0, -0.6], fir: [-1.4, 0, -1.4], sled: [1.2, 0, 0.4], chest: [0.4, 0, 0.7], berries: [0.6, 0, 0.6] };
   let slotI = 0;
   function show(key) {
     if (!stage) { stage = new THREE.Group(); stage.position.copy(STAGE); stage.lookAt(X.FIRE3.x, STAGE.y, X.FIRE3.z); lukGroup.add(stage); stage.userData.a = {}; slotI = 0; }
@@ -184,6 +214,8 @@ export function initEvening(c, X) {
     if (name === 'princess' && A.frog) { c.burst(w(A.frog).add(new THREE.Vector3(0, 0.6, 0)), 0x9ae86a, 40, 4, 1.2, 0.18); A.frog.visible = false; show('princess'); S.magic(); }
     if (name === 'burn') { c.burst(X.FIRE3.clone().add(new THREE.Vector3(0, 1.2, 0)), 0x4caf50, 30, 4, 1, 0.16); c.burst(X.FIRE3.clone().add(new THREE.Vector3(0, 1.4, 0)), 0xff9a2a, 30, 5, 1, 0.2); if (A.princess) A.princess.userData.leave = 1; S.dark && S.dark(); }
     if (name === 'dance') { Object.values(A).forEach((o) => (o.userData.dance = 1)); if (A.princess) { A.princess.visible = true; A.princess.userData.leave = 0; A.princess.position.copy(A.princess.userData.base); } S.chime(); }
+    if (name === 'spring' && A.months) { c.burst(w(A.months).add(new THREE.Vector3(0, 0.8, 0)), 0x9ae86a, 50, 4, 1.4, 0.18); c.burst(w(A.months).add(new THREE.Vector3(0, 0.4, 0)), 0xb07aff, 30, 3, 1.2, 0.16); S.chime(); }
+    if (name === 'snow') { const p = (A.months ? w(A.months) : X.FIRE3.clone()).add(new THREE.Vector3(0, 1.5, 0)); c.burst(p, 0xffffff, 120, 6, 2, 0.2); S.freeze && S.freeze(); c.shake(0.2); }
     if (name === 'foxRun' && A.fox) { A.fox.userData.leave = 1; Object.values(A).forEach((o) => (o.userData.dance = 1)); S.chime(); }
   }
   function updateStage(dt) {
@@ -344,5 +376,5 @@ export function initEvening(c, X) {
     const tr = Object.keys(NPC).map((k) => `<div class="entry">${NPC[k].name}: ${'💛'.repeat(Math.min(3, s.trust[k] || 0))}${'🤍'.repeat(Math.max(0, 3 - (s.trust[k] || 0)))}${s.charms.includes(k) ? ` · ${CHARMS[k].icon} <b>${CHARMS[k].name}</b> — ${CHARMS[k].text}` : ''}</div>`).join('');
     return `<h3>Сказки на ночь (${s.nightTales.length}/${NIGHT_TOTAL})</h3>${nt}<p class="muted small">Ночью у костра Кот рассказывает новую сказку. Чтобы дождаться ночи, посиди у костра.</p><h3>Доверие и обереги</h3>${tr}<p class="muted small">Перескажи сказ из Книги Коту, Русалке, Кикиморе или Деду. Две верно пересказанные сказки — и друг смастерит оберег.</p>`;
   }
-  return { update, tintSky, night: () => night, fireMenu, applyCharms, hpBonus, bookHtml, hasVoice, setTod: (t) => (tod = t), tod: () => tod, bedtime, NIGHT_TALES, fb: () => fb };
+  return { canTell, retell, update, tintSky, night: () => night, fireMenu, applyCharms, hpBonus, bookHtml, hasVoice, setTod: (t) => (tod = t), tod: () => tod, bedtime, NIGHT_TALES, fb: () => fb };
 }

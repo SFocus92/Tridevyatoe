@@ -159,6 +159,13 @@ CH = {
  'snegurochka':dict(skin=C('f8dcc8'), hair=C('f2dc8a'), hairLen=0.9, shirt=C('9fd2f2'), coat=True, fur=C('ffffff'), snow=True, sleeve=C('9fd2f2'), cuff=C('ffffff'), pants=C('9fd2f2'), boots=C('ffffff'), bootH=0.9, lashes=True, mouth='smile', eyeC=(70, 140, 200), blushC=C('f4b0c0'), fringe=0.16),
  'leshy':      dict(skin=C('8a9a5a'), hair=C('3e6a2a'), hairLen=0.8, shirt=C('5a4a2a'), moss=C('4f7a2e'), sleeve=C('4a3a20'), pants=C('3e3220'), boots=C('2a2014'), beard=C('4f7a2e'), glowEyes=(255, 220, 60), blush=False, mouth='grin'),
  'alyonushka': dict(skin=SK, hair=C('8a5a2e'), hairLen=0.9, shirt=C('f6f1e6'), sleeve=C('f6f1e6'), cuff=C('e05a7a'), sarafan=C('d83a5a'), trim=C('ffffff'), pants=C('d83a5a'), boots=C('8a4a2a'), bootH=0.9, hem=C('ffffff'), lashes=True, mouth='sad', eyeC=(90, 60, 40), fringe=0.16),
+ 'ilya':       dict(skin=SK, hair=C('7a4a22'), shirt=C('9aa4ae'), sleeve=C('8a949e'), collar=C('c8302a'), collar2=C('f2c033'), belt=C('c8302a'), pants=C('3a4a6a'), boots=C('8a2a20'), bootH=0.82, beard=C('7a4a22'), beardLen=1.0, mouth='smile', eyeC=(60, 90, 140), feathers=C('b8c0c8')),
+ 'sadko':      dict(skin=SK, hair=C('c88a3a'), shirt=C('2a6ab0'), collar=C('f2c033'), collar2=C('c8302a'), belt=C('f2c033'), sleeve=C('2a6ab0'), cuff=C('f2c033'), pants=C('8a2a3a'), boots=C('c8a040'), mouth='grin', eyeC=(50, 110, 160)),
+ 'seaking':    dict(skin=C('bfe0d8'), hair=C('dff4f0'), hairLen=0.8, shirt=C('1f7a8a'), coat=True, fur=C('e8f0e0'), sleeve=C('1f6a7a'), cuff=C('f2c033'), pants=C('16505c'), boots=C('0f3a44'), bootH=0.86, beard=C('cfeee6'), mouth='smile', eyeC=(30, 120, 130), blushC=C('9fd8d0')),
+ 'starik':     dict(skin=SK, hair=C('d8d8d0'), shirt=C('c8c0a8'), patches=[(110, 820, C('9a8a6a')), (330, 840, C('7a8a9a'))], belt=C('6a5a3a'), pants=C('6a6a72'), boots=C('c9a36a'), lapti=True, beard=C('ececec'), mouth='smile', wrinkles=True),
+ 'staruha':    dict(skin=SK, hair=C('c8c8c0'), scarf=C('5a7a3a'), shirt=C('8a5a3a'), sleeve=C('7a4a2e'), sarafan=C('6a3a5a'), trim=C('d8b060'), pants=C('6a3a5a'), boots=C('3a2a1a'), bootH=0.9, mouth='flat', wrinkles=True, angry=True),
+ 'tsarevna':   dict(skin=C('f8dcc8'), hair=C('3a2a1a'), hairLen=0.9, shirt=C('f6f1e6'), sleeve=C('f6f1e6'), cuff=C('3aa04a'), sarafan=C('2e8a4a'), trim=C('f2c033'), pants=C('2e8a4a'), boots=C('c8a040'), bootH=0.9, hem=C('f2c033'), lashes=True, mouth='smile', eyeC=(40, 120, 60), fringe=0.16),
+ 'elena':      dict(skin=C('f8dcc8'), hair=C('f2c860'), hairLen=0.9, shirt=C('fff6f0'), sleeve=C('fff6f0'), cuff=C('e86a9a'), sarafan=C('e86a9a'), trim=C('ffffff'), pants=C('e86a9a'), boots=C('c8a040'), bootH=0.9, hem=C('f2c033'), lashes=True, mouth='smile', eyeC=(60, 100, 170), fringe=0.16),
 }
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)

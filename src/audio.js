@@ -14,10 +14,12 @@ export const THEMES = {
   koschei: { mode: 'phryg', root: -5, beat: 0.4, lead: 'flute', drum: 2, pad: true, bass: [0, 1, 0, -2], mel: [[0, -99, 1, 0, -99, -99, -1, -99], [3, 2, 1, -99, 0, -99, -99, -99], [-99, 4, 3, 1, 0, 1, -99, -99], [0, -99, -99, -99, -1, -99, 0, -99]] },
   boss: { mode: 'phryg', root: -5, beat: 0.22, lead: 'balalaika', drum: 3, bass: [0, 0, 1, -2], mel: [[0, 1, 0, -1, 0, 3, 1, 0], [4, 3, 1, 0, 1, 0, -1, 0], [0, 1, 3, 4, 5, 4, 3, 1], [0, -99, 0, -99, 1, 0, -1, -99]] },
   night: { mode: 'minor', root: -3, beat: 0.5, lead: 'bell', drum: 0, pad: true, bass: [0, 3, 4, 0], mel: [[4, -99, 2, -99, 4, -99, 2, -99], [4, 3, 2, 1, 2, -99, -99, -99], [2, -99, 1, -99, 2, -99, 0, -99], [1, 0, -1, 1, 0, -99, -99, -99]] }, // колыбельная «Баю-баюшки-баю»
+  sea: { mode: 'dorian', root: -3, beat: 0.34, lead: 'bell', drum: 0, pad: true, bass: [0, 5, 3, 4], mel: [[0, 2, 4, -99, 5, 4, 2, -99], [4, -99, 5, 7, 5, -99, 4, 2], [2, 4, 5, 4, 2, -99, 0, -99], [1, 2, 0, -99, -1, -99, 0, -99]] }, // «Садко»: гусли под водой
+  bridge: { mode: 'dorian', root: 2, beat: 0.28, lead: 'balalaika', drum: 2, pad: true, bass: [0, -2, 3, 4], mel: [[0, 0, 2, 3, 4, -99, 3, 2], [4, 5, 7, 5, 4, 3, 2, -99], [0, 2, 3, 4, 3, 2, 0, -1], [0, -99, 2, -99, 0, -99, -99, -99]] }, // богатырская: Калинов мост
   finale: { mode: 'major', root: 0, beat: 0.26, lead: 'balalaika', drum: 1, pad: true, bass: [0, 3, 4, 0], mel: [[0, 2, 4, 5, 4, 2, 4, 7], [5, 4, 2, 4, 2, 1, 0, -99], [4, 4, 5, 7, 5, 4, 2, 4], [2, 1, 2, 4, 0, -99, 0, -99]] },
 };
 // длительности петель (сек) — пишет tools/render_music.js
-export const MUSIC_LEN = { luk: 28.8, forest: 34.56, mountains: 26.88, rivers: 25.92, koschei: 38.4, boss: 21.12, night: 32, finale: 24.96 }; // длины петель в assets/music (для плееров, не срезающих задержку mp3)
+export const MUSIC_LEN = { luk: 28.8, forest: 34.56, mountains: 26.88, rivers: 25.92, koschei: 38.4, boss: 21.12, night: 32, finale: 24.96, sea: 32.64, bridge: 26.88 }; // длины петель в assets/music (для плееров, не срезающих задержку mp3)
 export class Sound {
   constructor() {
     this.ctx = null; this.theme = 'luk'; this.color = 0.12; this.musicOn = false;

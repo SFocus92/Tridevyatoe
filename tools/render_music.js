@@ -4,7 +4,7 @@ const { chromium } = require('playwright'); const fs = require('fs'); const { ex
   const b = await chromium.launch({ executablePath: execSync('which chromium').toString().trim(), args: ['--autoplay-policy=no-user-gesture-required'] });
   const p = await b.newPage(); p.on('pageerror', (e) => console.log('ERR', e.message));
   await p.goto('http://localhost:8765/tools/render_music.html'); await p.waitForFunction(() => window.ready);
-  const names = process.argv.slice(2).length ? process.argv.slice(2) : ['luk', 'forest', 'mountains', 'rivers', 'koschei', 'boss', 'finale', 'night'];
+  const names = process.argv.slice(2).length ? process.argv.slice(2) : ['luk', 'forest', 'mountains', 'rivers', 'koschei', 'boss', 'finale', 'night', 'sea', 'bridge'];
   for (const n of names) {
     const r = await p.evaluate((n) => window.renderTheme(n, n === 'night' || n === 'mountains' ? 2 : 3), n);
     const pcm = Buffer.from(r.b64, 'base64'); const wav = `/tmp/${n}.raw`; fs.writeFileSync(wav, pcm);
