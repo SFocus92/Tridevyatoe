@@ -300,7 +300,8 @@ export function initEvening(c, X) {
   async function sleepTo(t, msg) { c.fade(1); await c.wait(900); tod = t; c.st.tod = tod; player.hp = player.maxHp; player.word = 100; S.sleep(); await c.wait(700); c.fade(0); if (msg) ui.toast(msg, false, 3000); }
   async function fireMenu() {
     const s = ensure(c.st); if (!s.restored) return;
-    const isNight = night > 0.5; const next = NIGHT_TALES.find((t) => !s.nightTales.includes(t.title));
+    const isNight = night > 0.5; const want = s.extra?.sivkaAsk && !s.nightTales.includes('Сивка-Бурка') && NIGHT_TALES.find((t) => t.title === 'Сивка-Бурка'); // царевна попросила — Кот расскажет её первой
+    const next = want || NIGHT_TALES.find((t) => !s.nightTales.includes(t.title));
     if (!isNight) {
       const k = await ui.dialog('Костёр', 'Над Лукоморьем светло. Кот обещал вечером рассказать сказку на ночь.', ['Подождать у костра до ночи 🌙', 'Пойти дальше']);
       if (k === 0) await sleepTo(0.86, 'Стемнело. Над дубом зажглись звёзды…');

@@ -17,6 +17,8 @@ export function initExtra(c) {
   const oldman = c.npc('starik'); oldman.root.position.copy(OLDMAN); oldman.root.rotation.y = 2.2; g.add(oldman.root);
   const oldwoman = c.npc('staruha'); oldwoman.root.position.copy(V(44.6, 16.6)); oldwoman.root.rotation.y = 2.6; g.add(oldwoman.root);
   c.colliders.push({ x: OLDMAN.x, z: OLDMAN.z, r: 0.5 }, { x: oldwoman.root.position.x, z: oldwoman.root.position.z, r: 0.5 });
+  // фронтон: треугольник из брёвен в торце избы (x — торец, hw — полуширина, y0 — низ, y1 — конёк)
+  function gable(par, x, hw, y0, y1, mat) { const sh = new THREE.Shape(); sh.moveTo(-hw, 0); sh.lineTo(hw, 0); sh.lineTo(0, y1 - y0); sh.closePath(); const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), mat); m.material.side = THREE.DoubleSide; m.position.set(x, y0, 0); m.rotation.y = Math.PI / 2; par.add(m); return m; }
   // жилища: землянка → изба → терем
   const homes = { dug: new THREE.Group(), izba: new THREE.Group(), terem: new THREE.Group() };
   Object.values(homes).forEach((h) => { h.position.copy(HUT); h.rotation.y = 2.4; g.add(h); });
@@ -26,7 +28,8 @@ export function initExtra(c) {
     M(new THREE.CylinderGeometry(0.12, 0.12, 0.9, 6), dirt, 0.9, 1.4, -0.4, d); }
   { const z = homes.izba; const log = T3(0xa8743e), roof = T3(0x7a4a2a), win = new THREE.MeshBasicMaterial({ color: 0xffd76a });
     for (let i = 0; i < 6; i++) { const lg = M(new THREE.CylinderGeometry(0.22, 0.22, 4.2, 8), log, 0, 0.22 + i * 0.42, 1.5, z); lg.rotation.z = Math.PI / 2; const lg2 = lg.clone(); lg2.position.z = -1.5; z.add(lg2); const s1 = M(new THREE.CylinderGeometry(0.22, 0.22, 3.4, 8), log, 1.9, 0.22 + i * 0.42, 0, z); s1.rotation.x = Math.PI / 2; const s2 = s1.clone(); s2.position.x = -1.9; z.add(s2); }
-    const r1 = M(new THREE.BoxGeometry(4.6, 0.15, 2.4), roof, 0, 3.15, 0.85, z); r1.rotation.x = -0.6; const r2 = M(new THREE.BoxGeometry(4.6, 0.15, 2.4), roof, 0, 3.15, -0.85, z); r2.rotation.x = 0.6;
+    const r1 = M(new THREE.BoxGeometry(4.6, 0.15, 2.4), roof, 0, 3.15, 0.85, z); r1.rotation.x = 0.6; const r2 = M(new THREE.BoxGeometry(4.6, 0.15, 2.4), roof, 0, 3.15, -0.85, z); r2.rotation.x = -0.6; // конёк вверх
+    gable(z, 1.92, 1.75, 2.5, 3.85, log); gable(z, -1.92, 1.75, 2.5, 3.85, log);
     M(new THREE.PlaneGeometry(0.7, 0.6), win, 0.9, 1.4, 1.75, z); M(new THREE.BoxGeometry(0.9, 1.6, 0.1), T3(0x6a4020), -0.8, 0.8, 1.74, z); M(new THREE.BoxGeometry(0.6, 1.2, 0.6), T3(0xeeeeee), 1.2, 3.4, -0.4, z); }
   { const t = homes.terem; const w = T3(0xf0e0c0), red = T3(0xc0392b), gold = T3(0xf2c033, { emissive: 0x3a2600 }), win = new THREE.MeshBasicMaterial({ color: 0xffd76a });
     M(new THREE.BoxGeometry(4.6, 2.6, 3.6), w, 0, 1.3, 0, t); M(new THREE.BoxGeometry(3.4, 2, 2.8), w, 0, 3.6, 0, t);
@@ -124,7 +127,7 @@ export function initExtra(c) {
   async function callHorse() {
     const e = X();
     if (e.sivka >= 2) { HR.visible = true; HR.position.copy(c.STONE3).add(new THREE.Vector3(2, 0, -2)); e.horseAt = [HR.position.x, HR.position.z]; S.stomp(); c.burst(HR.position.clone().setY(HR.position.y + 1), 0xffe27a, 40, 4, 1); await ui.say(SB, ['(Конь бежит — земля дрожит, из ушей дым столбом валит!) Здесь я, хозяин!']); return; }
-    await ui.say(me(), ['(Полночь. Луна над камнем на распутье. Пора позвать чудесного коня…)']);
+    await ui.say(me(), [c.night() > 0.5 ? '(Полночь. Луна над камнем на распутье. Пора позвать чудесного коня…)' : '(Камень на распутье. Ветер стих, трава не шелохнётся. Пора позвать чудесного коня…)']);
     const opts = shuffle(['«Сивка-бурка, вещая каурка, встань передо мной, как лист перед травой!»', '«Но, лошадка, скачи сюда!»', '«По щучьему велению — конь, явись!»']);
     const k = await ui.dialog(me(), 'Какими словами позвать коня?', opts);
     if (!opts[k] || !opts[k].startsWith('«Сивка')) { S.wrong(); await ui.say(me(), ['…Тишина. Только сверчки. Видно, не те слова. (Вспомни сказку Кота!)']); return; }
@@ -150,7 +153,11 @@ export function initExtra(c) {
     c.addBook('Сивка-Бурка, вещая каурка', 'В полночь у камня на распутье Сказитель позвал чудесного коня заветными словами — и прискакал Сивка-Бурка. Раз — не допрыгнул до окошка царевны, два — чуть-чуть, а на третий раз — до самого окна! Царевна Елена приложила к его лбу перстень, а Сивка-Бурка остался верным конём.');
     ui.toast('🐎 Сивка-Бурка — твой конь в Лукоморье: F рядом — сесть, у камня — позвать', true, 5000);
   }
-  async function elenaTalk() { const e = X(); await ui.say(EL, e.sivka >= 2 ? ['Здравствуй, мой прыгун! Печать на лбу ещё блестит.'] : e.sivka === 1 ? ['(из окошка) Ну же, на коне — прыгай! Кто допрыгнет — тому перстень.'] : ['(из окошка) Ах, скучно в тереме! Вот бы кто на чудесном коне до окошка допрыгнул…']); }
+  async function elenaTalk() { const e = X(); if (e.sivka >= 1) { await ui.say(EL, e.sivka >= 2 ? ['Здравствуй, мой прыгун! Печать на лбу ещё блестит.'] : ['(из окошка) Ну же, на коне — прыгай! Кто допрыгнет — тому перстень.']); return; }
+    const known = c.nightTales().includes('Сивка-Бурка');
+    await ui.say(EL, ['(из окошка) Ах, скучно в тереме! Кто на чудесном коне до окошка допрыгнет — тому перстень подарю.', 'Пешком сюда не допрыгнуть, а простой лошадке и подавно. Нужен вещий конь — Сивка-Бурка!',
+      known ? 'Ты ведь знаешь сказку — помнишь заветные слова? Ступай к вещему камню на распутье и позови коня!' : 'Как его позвать — знает Кот учёный. Попроси его вечером у костра рассказать сказку «Сивка-Бурка», а потом позови коня у вещего камня на распутье.']);
+    if (!e.sivkaAsk) { e.sivkaAsk = true; c.save(); S.chime(); ui.toast(known ? '🐎 Иди к вещему камню и позови Сивку-Бурку' : '🐎 Ночью у костра Кот расскажет «Сивку-Бурку» — а потом зови коня у камня', true, 4500); } }
 
   // ================= Царевна-лягушка =================
   const ARROW = c.KIKI_POS.clone().add(new THREE.Vector3(5.5, 0, -4)); ARROW.y = Math.max(H(ARROW.x, ARROW.z), 0.2);
@@ -205,7 +212,7 @@ export function initExtra(c) {
   // нитки в других краях
   function onRegion(id, R) {
     if (!THR[id]) return; const [, col] = THR[id]; const sp = R.spawn(); const pos = new THREE.Vector3(sp.x + 3.5, 0, sp.z - 3); pos.y = R.H(pos.x, pos.z) + 0.6;
-    const spool = new THREE.Group(); spool.position.copy(pos); R.group.add(spool);
+    const spool = new THREE.Group(); spool.position.copy(pos); spool.visible = X().frog === 1 && !X().thr[id]; R.group.add(spool);
     const wm = c.toon(col, { emissive: new THREE.Color(col).multiplyScalar(0.35) }, true);
     M(new THREE.CylinderGeometry(0.28, 0.28, 0.5, 14), wm, 0, 0, 0, spool); for (const y of [-0.28, 0.28]) M(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 14), T3(0x9a6a3e), 0, y, 0, spool);
     const glow = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false })); spool.add(glow);
@@ -233,7 +240,7 @@ export function initExtra(c) {
     { label: 'Поговорить со Стариком', pos: () => oldman.root.position, r: 3.2, cond: () => inLuk(), act: oldmanTalk },
     { label: 'Поговорить со Старухой', pos: () => oldwoman.root.position, r: 3.2, cond: () => inLuk(), act: oldwomanTalk },
     { label: 'Позвать золотую рыбку', pos: () => CALL, r: 4.2, prio: 1, cond: () => inLuk() && X().fish && !X().fishEnd && X().want > X().wish, act: callFish },
-    { label: 'Позвать Сивку-Бурку', pos: () => c.STONE3, r: 3.4, prio: 1, cond: () => inLuk() && !player.ride && (X().sivka >= 2 || (X().sivka === 0 && c.nightTales().includes('Сивка-Бурка') && c.night() > 0.5)), act: callHorse },
+    { label: 'Позвать Сивку-Бурку', pos: () => c.STONE3, r: 3.4, prio: 1, cond: () => inLuk() && !player.ride && (X().sivka >= 2 || (X().sivka === 0 && c.nightTales().includes('Сивка-Бурка'))), act: callHorse },
     { label: 'Сесть на Сивку-Бурку', pos: () => HR.position, r: 2.8, prio: 1, cond: () => inLuk() && HR.visible && !player.ride && X().sivka >= 1, act: async () => mount() },
     { label: 'Спешиться', pos: () => player.pos, r: 1, prio: -40, cond: () => inLuk() && player.ride, act: async () => dismount() },
     { label: 'Допрыгнуть до окошка царевны', pos: () => DOOR, r: 4.5, prio: 2, cond: () => inLuk() && player.ride && X().sivka === 1, act: teremJump },
@@ -253,7 +260,9 @@ export function initExtra(c) {
     if (e.frog === 1) return !e.loaf ? [c.FIRE3, 'испечь каравай у костра'] : thrN() < 3 ? [c.PORTAL3, 'за нитками для ковра — в лес, горы, к молочным рекам'] : [frog.position, 'к лягушке — плясать!'];
     if (e.sivka === 1) return [DOOR, 'на Сивке-Бурке — к терему царевны'];
     if (e.frog === 0 && c.nightTales().includes('Царевна-лягушка')) return [ARROW, 'на болоте лежит чья-то стрела…'];
-    if (e.sivka === 0 && c.nightTales().includes('Сивка-Бурка')) return [c.STONE3, c.night() > 0.5 ? 'к вещему камню — позови Сивку-Бурку' : 'дождись ночи у костра — и позови Сивку-Бурку у камня'];
+    if (e.sivka === 0 && c.nightTales().includes('Сивка-Бурка')) return [c.STONE3, 'к вещему камню на распутье — позови Сивку-Бурку'];
+    if (e.sivka === 0 && e.sivkaAsk) return [c.FIRE3, 'вечером у костра попроси Кота рассказать «Сивку-Бурку»'];
+    if (s.restored && e.sivka === 0 && !e.sivkaAsk) return [DOOR, 'к терему на южном берегу — царевна Елена скучает в окошке'];
     return null;
   }
   function tracker() {
@@ -261,7 +270,7 @@ export function initExtra(c) {
     if (s.restored) h += `<br>${ck(s.sea.done)} 🐚 Морское царство${s.sea.met ? '' : ' — спроси Русалку'}`;
     if (s.sea.done) h += `<br>${ck(s.bridge.done)} 🔥 Калинов мост${!s.mount.done ? ' — после Ледяных гор' : s.heroes.includes('ilya') ? '' : ' — Илья Муромец'}`;
     if (s.restored) h += `<br>${ck(e.fishEnd)} 🐟 Рыбак и рыбка${e.fishEnd ? '' : !e.fish ? ' — рыбка в сетях под водой' : e.want > e.wish ? ' — позови рыбку' : ` — желаний ${e.wish}/3`}`;
-    if (c.nightTales().includes('Сивка-Бурка')) h += `<br>${ck(e.sivka >= 2)} 🐎 Сивка-Бурка${e.sivka === 0 ? ' — ночью у камня' : e.sivka === 1 ? ' — прыжок к терему' : ''}`;
+    if (s.restored || c.nightTales().includes('Сивка-Бурка')) h += `<br>${ck(e.sivka >= 2)} 🐎 Сивка-Бурка${e.sivka === 0 ? (c.nightTales().includes('Сивка-Бурка') ? ' — позови у вещего камня' : e.sivkaAsk ? ' — сказка у Кота (костёр, ночь)' : ' — спроси царевну в тереме') : e.sivka === 1 ? ' — прыжок к терему' : ''}`;
     if (c.nightTales().includes('Царевна-лягушка')) h += `<br>${ck(e.frog >= 2)} 🐸 Царевна-лягушка${e.frog === 0 ? ' — стрела на болоте' : e.frog === 1 ? ` — ${e.loaf ? '🍞' : '☐🍞'} 🧵${thrN()}/3` : ''}`;
     return h;
   }
@@ -274,6 +283,7 @@ export function initExtra(c) {
     if (p.ride) { HR.visible = luk; HR.position.copy(p.pos); HR.rotation.y = p.facing; hp.play(p.walk > 0.3 && canMove ? 'walk' : 'idle'); if (hp.actions?.walk) hp.actions.walk.timeScale = 1.6; }
     else if (luk && e.sivka >= 1) { HR.visible = !!e.horseAt || e.sivka >= 1; if (e.horseAt) HR.position.set(e.horseAt[0], H(e.horseAt[0], e.horseAt[1]), e.horseAt[1]); else if (e.sivka >= 1 && !HR.userData.placed) { HR.position.copy(HORSE_HOME); } HR.userData.placed = true; hp.play('idle'); }
     else if (!p.ride && e.sivka === 0) HR.visible = HR.visible && luk;
+    for (const [id, o] of Object.entries(spools)) { o.spool.visible = e.frog === 1 && !e.thr[id]; o.spool.rotation.y += dt * 1.5; } // нитки видны только во время сказки о Царевне-лягушке
     if (!luk) return;
     // рыбка-подсказка: плеск у кромки, когда её можно звать
     fishT -= dt; if (e.fish && !e.fishEnd && e.want > e.wish && fishT < 0) { fishT = 2.5; c.burst(CALL.clone().setY(0.3), 0xffe14a, 8, 1.5, 0.8, 0.15); }
@@ -286,7 +296,6 @@ export function initExtra(c) {
     frog.visible = e.frog === 1 || (e.frog === 0 && arrow.visible); if (frog.visible) { frog.position.y = H(frog.position.x, frog.position.z) + Math.abs(Math.sin(T * 2.2)) * 0.12; frog.rotation.y = Math.atan2(p.pos.x - frog.position.x, p.pos.z - frog.position.z); }
     if (e.frog >= 2) { tsar.root.visible = true; carpet.visible = true; carpet.position.y = H(carpet.position.x, carpet.position.z) + 0.9 + Math.sin(T * 1.5) * 0.15; carpet.rotation.z = Math.sin(T * 1.2) * 0.05; if (near2(p.pos, tsar.root.position, 8)) tsar.root.rotation.y = Math.atan2(p.pos.x - tsar.root.position.x, p.pos.z - tsar.root.position.z); }
     else if (!frog.visible) tsar.root.visible = false;
-    for (const [id, o] of Object.entries(spools)) { o.spool.visible = e.frog === 1 && !e.thr[id]; o.spool.rotation.y += dt * 1.5; }
     for (const ch of [oldman, oldwoman]) if (near2(p.pos, ch.root.position, 6)) ch.root.rotation.y = Math.atan2(p.pos.x - ch.root.position.x, p.pos.z - ch.root.position.z);
   }
   function near2(a, b, r) { return Math.hypot(a.x - b.x, a.z - b.z) < r; }

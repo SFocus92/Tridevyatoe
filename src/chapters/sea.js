@@ -63,7 +63,7 @@ export default function sea(ctx) {
   tintP(kit('castle/gate', PAL.x, PAL.z + 3.4, 3.8, Math.PI / 2, -0.2, group, baseH), pearl2);
   const shellM = ctx.lifeify(new THREE.MeshToonMaterial({ color: 0xffc8d8, gradientMap: ctx.grad, emissive: 0x2a1018 }));
   const throne = new THREE.Group(); throne.position.set(PAL.x, baseH(PAL.x, PAL.z + 7), PAL.z + 7); group.add(throne);
-  { const sh = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 8, 0, Math.PI, 0, Math.PI / 2), shellM); sh.rotation.x = -Math.PI / 2; sh.rotation.z = Math.PI; sh.position.set(0, 0.1, -0.8); sh.scale.set(1, 1, 1.4); throne.add(sh); M(new THREE.CylinderGeometry(0.9, 1, 0.7, 14), pearl2, 0, 0.35, 0, throne); }
+  { const sh = new THREE.Mesh(new THREE.SphereGeometry(1.8, 16, 8, 0, Math.PI, 0, Math.PI / 2), shellM); sh.rotation.x = -Math.PI / 2; sh.position.set(0, 0.1, -1.2); shellM.side = THREE.DoubleSide; /* раковина-спинка позади царя */ sh.scale.set(1, 1, 1.4); throne.add(sh); M(new THREE.CylinderGeometry(0.9, 1, 0.7, 14), pearl2, 0, 0.35, 0, throne); }
   // ===== затонувший корабль =====
   const ship = new THREE.Group(); ship.position.set(SHIP.x, baseH(SHIP.x, SHIP.z) + 0.4, SHIP.z); ship.rotation.set(0.12, 0.8, 0.22); group.add(ship);
   { const wd = ctx.lifeify(new THREE.MeshToonMaterial({ color: 0x6a4a2e, gradientMap: ctx.grad })), wd2 = ctx.lifeify(new THREE.MeshToonMaterial({ color: 0x8a6440, gradientMap: ctx.grad })), sail = ctx.lifeify(new THREE.MeshToonMaterial({ color: 0xd8ccb0, gradientMap: ctx.grad, side: THREE.DoubleSide }));
@@ -101,7 +101,7 @@ export default function sea(ctx) {
     for (let i = 0; i < 10; i++) { const x = (R() - 0.5) * 6, z = (R() - 0.5) * 20; const y = Math.sqrt(Math.max(0, 1 - (x / 5.6) ** 2 - (z / 15.2) ** 2)) * 6.4; if (y < 2) continue; const t = new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.4, 6), kelpM2); t.position.set(x, y + 0.5, z); whale.add(t); } }
   const wl = (lx, lz) => { const v = new THREE.Vector3(lx, 0, lz).applyAxisAngle(new THREE.Vector3(0, 1, 0), whale.rotation.y).add(whale.position); v.y = H(v.x, v.z); return v; };
   // ===== жители =====
-  const king = npc('seaking', { scale: 0.86 }); king.root.position.copy(throne.position).add(V(0, 0, 0.7)); group.add(king.root);
+  const king = npc('seaking', { scale: 0.86 }); king.root.position.copy(throne.position).add(V(0, 0.7, 0.1)); /* стоит на троне, раковина — за спиной */ group.add(king.root);
   const sadko = npc('sadko'); sadko.root.position.set(PAL.x + 3, baseH(PAL.x + 3, PAL.z + 9.5), PAL.z + 9.5); sadko.root.rotation.y = -0.6; group.add(sadko.root); sadko.play('sit');
   const mer = ctx.makeMermaid(); mer.rotation.order = 'YXZ'; mer.scale.setScalar(1.3); group.add(mer); ctx.outline(mer); mer.position.copy(SPAWN).add(V(-3, -2, 2.4));
   colliders.push({ x: throne.position.x, z: throne.position.z, r: 1.4 });

@@ -44,7 +44,8 @@ export default function bridge(ctx) {
   const izba = new THREE.Group(); izba.position.copy(VIL).setY(H(VIL.x, VIL.z)); izba.rotation.y = 0.6; group.add(izba);
   { const log = toon(0xa8743e), roof = toon(0x7a4a2a), win = new THREE.MeshBasicMaterial({ color: 0xffd76a });
     for (let i = 0; i < 7; i++) { const a = M(new THREE.CylinderGeometry(0.24, 0.24, 5, 8), log, 0, 0.24 + i * 0.46, 2, izba); a.rotation.z = Math.PI / 2; const b = a.clone(); b.position.z = -2; izba.add(b); const c1 = M(new THREE.CylinderGeometry(0.24, 0.24, 4.4, 8), log, 2.3, 0.24 + i * 0.46, 0, izba); c1.rotation.x = Math.PI / 2; const c2 = c1.clone(); c2.position.x = -2.3; izba.add(c2); }
-    const r1 = M(new THREE.BoxGeometry(5.6, 0.18, 3), roof, 0, 3.9, 1.05, izba); r1.rotation.x = -0.62; const r2 = M(new THREE.BoxGeometry(5.6, 0.18, 3), roof, 0, 3.9, -1.05, izba); r2.rotation.x = 0.62;
+    const r1 = M(new THREE.BoxGeometry(5.6, 0.18, 3), roof, 0, 3.9, 1.05, izba); r1.rotation.x = 0.62; const r2 = M(new THREE.BoxGeometry(5.6, 0.18, 3), roof, 0, 3.9, -1.05, izba); r2.rotation.x = -0.62; // конёк вверх
+    for (const gx of [-2.32, 2.32]) { const sh = new THREE.Shape(); sh.moveTo(-2.2, 0); sh.lineTo(2.2, 0); sh.lineTo(0, 1.6); sh.closePath(); const gm = new THREE.Mesh(new THREE.ShapeGeometry(sh), log); gm.material.side = THREE.DoubleSide; gm.position.set(gx, 3.2, 0); gm.rotation.y = Math.PI / 2; izba.add(gm); }
     M(new THREE.PlaneGeometry(0.8, 0.7), win, 1.1, 1.6, 2.26, izba); M(new THREE.BoxGeometry(1, 1.9, 0.1), toon(0x6a4020), -1, 0.95, 2.25, izba); }
   colliders.push({ x: VIL.x, z: VIL.z, r: 3 }); ctx.camBlockers.push(izba);
   const bench = new THREE.Group(); bench.position.copy(ILYA).setY(H(ILYA.x, ILYA.z)); bench.rotation.y = 0.6; group.add(bench); M(new THREE.BoxGeometry(1.8, 0.12, 0.5), toon(0x8a6038), 0, 0.5, 0, bench); for (const x of [-0.75, 0.75]) M(new THREE.BoxGeometry(0.12, 0.5, 0.45), toon(0x6a4020), x, 0.25, 0, bench);

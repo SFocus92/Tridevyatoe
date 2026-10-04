@@ -24,14 +24,35 @@ export default function river(ctx) {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g.setIndex(idx); g.computeVertexNormals(); const m = new THREE.Mesh(g, milkM); m.material.side = THREE.DoubleSide; group.add(m); }
   const lake = new THREE.Mesh(new THREE.CircleGeometry(11.5, 40), milkM); lake.rotation.x = -Math.PI / 2; lake.position.set(LAKE.x, 0.1, LAKE.z); group.add(lake);
   // природа
-  const zones = [[SPAWN, 12], [ALYO, 4], [STOVE, 5], [APPLE, 5], [SPRING, 4], [LAKE, 15], [HILL, 6], [FIRE, 4]];
+  const MILL = V(HILL.x + 10, HILL.z + 6), WMILL = V(rx(CZ + 22) + 2.3, CZ + 22);
+  const zones = [[MILL, 4], [V(WMILL.x + 4.2, WMILL.z), 3],[SPAWN, 12], [ALYO, 4], [STOVE, 5], [APPLE, 5], [SPRING, 4], [LAKE, 15], [HILL, 6], [FIRE, 4]];
   const free = (x, z) => zones.every(([p, r]) => Math.hypot(x - p.x, z - p.z) > r + 2) && riverD(x, z) > 5;
   const TREES = ['town/tree-high-round', 'town/tree-crooked', 'survival/tree-autumn', 'survival/tree-autumn-tall'];
   for (let i = 0; i < 170; i++) { const a = R() * 6.28, r = 8 + Math.sqrt(R()) * 62; const x = CX + Math.cos(a) * r, z = CZ + Math.sin(a) * r; if (!free(x, z)) continue; const n = TREES[Math.floor(R() * 4)]; const s = (n.startsWith('town') ? 3.4 : 5) + R() * 1.5; const o = kit(n, x, z, s * (r > 52 ? 1.3 : 1), R() * 6.28, -0.1, group, H); if (r < 52) { colliders.push({ x, z, r: 0.6 }); ctx.camBlockers.push(o); } }
   const FL = ['flower_purpleA', 'flower_redA', 'flower_yellowA', 'flower_yellowB', 'flower_redB'];
   for (let i = 0; i < 220; i++) { const a = R() * 6.28, r = 4 + R() * 48; const x = CX + Math.cos(a) * r, z = CZ + Math.sin(a) * r; if (riverD(x, z) < 4 || lakeD(x, z) < 13) continue; ctx.P(i % 3 ? FL[i % 5] : 'grass_large', x, z, 4, R() * 6, 0, group, H); }
-  kit('town/watermill', rx(CZ + 22) + 4.2, CZ + 22, 3, -Math.PI / 2, 0.6, group, H); colliders.push({ x: rx(CZ + 22) + 4.2, z: CZ + 22, r: 2.6 });
-  kit('town/windmill', HILL.x + 5, HILL.z + 3, 3.4, 2.4, 0, group, H); colliders.push({ x: HILL.x + 5, z: HILL.z + 3, r: 1.2 });
+  // водяная мельница: колесо в молочной реке крутится, рядом — избушка мельника
+  { const wp = new THREE.Group(); wp.position.set(WMILL.x, 0.75, WMILL.z); group.add(wp); const wheel = kit('town/watermill', 0, 0, 2.6, 0, 0, wp, () => 0);
+    const hut = new THREE.Group(); const hx = WMILL.x + 4.2; hut.position.set(hx, H(hx, WMILL.z) - 0.2, WMILL.z); group.add(hut);
+    const wood = toon(0x9a6a3e), roofM = toon(0x7a4a2a); M(new THREE.BoxGeometry(3, 2.6, 3.6), wood, 0, 1.3, 0, hut);
+    for (const sz of [-1, 1]) { const r = M(new THREE.BoxGeometry(3.6, 0.15, 2.3), roofM, 0, 3.05, sz * 0.92, hut); r.rotation.x = sz * 0.62; }
+    const sh = new THREE.Shape(); sh.moveTo(-1.8, 0); sh.lineTo(1.8, 0); sh.lineTo(0, 1.2); sh.closePath(); for (const gx of [-1.5, 1.5]) { const gm = new THREE.Mesh(new THREE.ShapeGeometry(sh), wood); gm.material.side = THREE.DoubleSide; gm.position.set(gx, 2.6, 0); gm.rotation.y = Math.PI / 2; hut.add(gm); }
+    M(new THREE.CylinderGeometry(0.12, 0.12, 3, 6), wood, -2.6, 0.95, 0, hut).rotation.z = Math.PI / 2; // вал колеса
+    colliders.push({ x: hx, z: WMILL.z, r: 2.3 }, { x: WMILL.x, z: WMILL.z, r: 1.2 }); ctx.camBlockers.push(hut);
+    wp.userData.update = (dt) => { wheel.rotation.x -= dt * 0.9; }; }
+  // ветряная мельница у холма: сруб на каменном основании, крылья крутятся
+  { const mill = new THREE.Group(); let my = H(MILL.x, MILL.z); for (let a = 0; a < 6.28; a += 0.785) my = Math.min(my, H(MILL.x + Math.cos(a) * 2.3, MILL.z + Math.sin(a) * 2.3));
+    mill.position.set(MILL.x, my, MILL.z); mill.rotation.y = Math.atan2(SPAWN.x - MILL.x, SPAWN.z - MILL.z); group.add(mill);
+    const stone = toon(0x8a8478), wood = toon(0x9a6a3e), dark = toon(0x5a3a1e), roofM = toon(0x7a4a2a), win = new THREE.MeshBasicMaterial({ color: 0xffd76a });
+    M(new THREE.CylinderGeometry(2.5, 2.7, 3, 8), stone, 0, -0.6, 0, mill); // основание уходит в землю — не висит на склоне
+    M(new THREE.CylinderGeometry(1.5, 2.15, 5.4, 8), wood, 0, 3.6, 0, mill);
+    for (const y of [1.6, 3.4, 5.2]) M(new THREE.CylinderGeometry(2.2 - y * 0.12, 2.25 - y * 0.12, 0.12, 8), dark, 0, y, 0, mill);
+    M(new THREE.ConeGeometry(2, 2.3, 8), roofM, 0, 7.45, 0, mill);
+    M(new THREE.BoxGeometry(1, 1.7, 0.12), dark, 0, 1.75, 2.02, mill); M(new THREE.PlaneGeometry(0.6, 0.6), win, 0, 4.4, 1.78, mill);
+    const hub = M(new THREE.CylinderGeometry(0.3, 0.3, 1, 10), dark, 0, 5.9, 1.9, mill); hub.rotation.x = Math.PI / 2;
+    const pivot = new THREE.Group(); pivot.position.set(0, 5.9, 2.45); mill.add(pivot); kit('town/windmill', 0, 0, 2.5, Math.PI / 2, 0, pivot, () => 0);
+    colliders.push({ x: MILL.x, z: MILL.z, r: 2.6 }); ctx.camBlockers.push(mill);
+    mill.userData.update = (dt) => { pivot.rotation.z += dt * 0.8; }; }
   for (let i = 0; i < 8; i++) kit('town/fence', ALYO.x - 6 + i * 3, ALYO.z + 6, 3, Math.PI / 2, 0, group, H);
   kit('town/cart', ALYO.x + 5, ALYO.z + 2, 2.8, 0.7, 0, group, H); colliders.push({ x: ALYO.x + 5, z: ALYO.z + 2, r: 1.6 });
   for (let i = 0; i < 7; i++) { const a = i * 0.9; kit('holiday/rocks-medium', LAKE.x + Math.cos(a) * 2.6, LAKE.z + Math.sin(a) * 2.6, 0.9, a, 7.6, group, () => 0); }
