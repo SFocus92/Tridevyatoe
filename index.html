@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Тридевятое: Сказитель — вертикальный срез</title>
+<title>Тридевятое: Сказитель</title>
+<link rel="preload" href="assets/fonts/RuslanDisplay.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="assets/fonts/Kurale.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="assets/ui/title.jpg" as="image" media="(min-width: 821px)">
+<link rel="preload" href="assets/ui/title_m.jpg" as="image" media="(max-width: 820px)">
 <link rel="stylesheet" href="style.css" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪶</text></svg>" />
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script>
@@ -83,19 +87,31 @@
 </div>
 
 <div id="title">
+  <div class="tBg"></div>
+  <div class="tShade"></div>
+  <div class="tSparks"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="titleInner">
-    <div class="orn">— ◆ —</div>
+    <div class="orn"></div>
     <h1>Тридевятое</h1>
     <h2>Сказитель</h2>
+    <div class="orn flip"></div>
     <p class="tag">Кощей крадёт не жизни, а память о сказках.<br>Свяжи порванные Нити Сказа — и мир оживёт.</p>
+    <div class="load"><div class="loadBar"><i id="loadFill"></i></div><div id="loadHint">Кот учёный точит перо…</div></div>
     <div class="btns">
       <button id="btnNew" disabled>Загрузка…</button>
       <button id="btnCont" class="hidden">Продолжить</button>
     </div>
-    <p class="muted">Лукоморье · 5 сказок · Иван-дурак · ~30 минут</p>
+    <p class="muted">7 краёв · 20 сказов · 4 героя · по мотивам русских народных сказок</p>
     <p class="muted small">WASD · мышь · Q — взгляд · F — действие · ЛКМ — удар</p>
   </div>
 </div>
+<script>
+  (function () { // присказки, пока грузится сказка
+    var H = ['Кот учёный точит перо…', 'Русалка расчёсывает косы…', 'Баба-Яга метёт избушку…', 'Морозко рисует узоры на окнах…', 'Гуси-лебеди собираются в стаю…', 'Садко настраивает гусли…', 'Илья Муромец потягивается на печи…', 'Жар-птица чистит пёрышки…', 'Сивка-Бурка бьёт копытом…', 'Кощей пересчитывает сундуки…'];
+    var i = 0, el = document.getElementById('loadHint');
+    var iv = setInterval(function () { if (!document.getElementById('title') || document.getElementById('title').classList.contains('ready')) return clearInterval(iv); i = (i + 1) % H.length; el.style.opacity = 0; setTimeout(function () { el.textContent = H[i]; el.style.opacity = 1; }, 350); }, 2600);
+  })();
+</script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

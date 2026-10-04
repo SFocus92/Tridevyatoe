@@ -100,14 +100,15 @@ const seaBaseY = Float32Array.from(seaGeo.attributes.position.array);
 // ---------- декор (Kenney Nature Kit, CC0, перекрашен в лубочную палитру) ----------
 const MODEL_NAMES = ['tree_pineTallA', 'tree_pineTallB', 'tree_pineRoundC', 'tree_pineDefaultA', 'tree_detailed', 'tree_default', 'tree_oak', 'tree_fat', 'tree_plateau', 'tree_simple', 'flower_purpleA', 'flower_redA', 'flower_yellowA', 'flower_yellowB', 'flower_redB', 'mushroom_red', 'mushroom_redGroup', 'mushroom_tanGroup', 'plant_bush', 'plant_bushLarge', 'plant_bushDetailed', 'grass_large', 'grass_leafs', 'rock_largeA', 'rock_largeC', 'rock_smallA', 'rock_tallB', 'stone_tallA', 'stone_largeB', 'stump_old', 'stump_round', 'log', 'log_large', 'log_stack', 'lily_large', 'lily_small', 'crop_turnip', 'campfire_stones', 'canoe', 'sign', 'crops_dirtRow', 'crops_wheatStageB', 'crops_leafsStageB'];
 const btnNew = document.getElementById('btnNew');
-const prog = [0, 0, 0]; const showProg = () => (btnNew.textContent = `Загрузка… ${Math.round((prog[0] * 0.25 + prog[1] * 0.55 + prog[2] * 0.2) * 100)}%`);
+const prog = [0, 0, 0]; const loadFill = document.getElementById('loadFill');
+const showProg = () => { const k = Math.round((prog[0] * 0.25 + prog[1] * 0.55 + prog[2] * 0.2) * 100); btnNew.textContent = `Загрузка… ${k}%`; if (loadFill) loadFill.style.setProperty('--p', Math.max(3, k) + '%'); };
 const KIT_LIST = await (await fetch('assets/kits/index.json')).json();
 const [{ models: MD }, { kits: KITS, anims: KIT_ANIMS }] = await Promise.all([
   loadModels(MODEL_NAMES, toon, (k) => { prog[0] = k; showProg(); }),
   loadKits(KIT_LIST, grad, lifeify, (k) => { prog[1] = k; showProg(); }),
   initCharacters(grad, (k) => { prog[2] = k; showProg(); }),
 ]);
-btnNew.textContent = 'Новая сказка'; btnNew.disabled = false;
+btnNew.textContent = 'Новая сказка'; btnNew.disabled = false; document.getElementById('title').classList.add('ready');
 const P = (n, x, z, s = 1, ry = srand() * 6.28, dy = 0) => place(MD, scene, n, x, H(x, z) + dy, z, s, ry);
 // экземпляр модели из текстурированного набора
 function kit(path, x, z, s = 1, ry = 0, dy = 0, parent = scene, hf = H) {
