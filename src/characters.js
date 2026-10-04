@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 let BASE = null, CLIPS = [], GRAD = null; const SKINS = {};
-const KINDS = ['ivan', 'ivanushka', 'ivan_false', 'vasilisa', 'finist', 'ded', 'yaga', 'koschei', 'morozko', 'snegurochka', 'leshy', 'alyonushka', 'ilya', 'sadko', 'seaking', 'starik', 'staruha', 'tsarevna', 'elena'];
+const KINDS = ['ivan', 'ivanushka', 'ivan_false', 'vasilisa', 'finist', 'ded', 'yaga', 'koschei', 'morozko', 'snegurochka', 'leshy', 'alyonushka', 'ilya', 'sadko', 'seaking', 'starik', 'staruha', 'tsarevna', 'elena', 'muzhik', 'soldat', 'babka', 'masha', 'havrosh', 'marya', 'solovei', 'tsarevich'];
 export async function initCharacters(grad, onProgress) {
   GRAD = grad; const loader = new GLTFLoader(); const tl = new THREE.TextureLoader(); let n = 0; const tot = KINDS.length + 1;
   const g = await loader.loadAsync('assets/kits/blocky/base.glb'); BASE = g.scene; CLIPS = g.animations; onProgress && onProgress(++n / tot);
@@ -98,7 +98,16 @@ export function makeChar(kind, { scale = 0.68, outline = true } = {}) {
     for (const x of [-0.22, 0, 0.22]) add(staff, new THREE.ConeGeometry(0.06, 0.4, 5), gold, x, 1.75, 0);
     add(staff, new THREE.BoxGeometry(0.5, 0.06, 0.06), gold, 0, 1.55, 0);
   }
-  if (kind === 'starik' || kind === 'staruha') model.rotation.x = 0.06;
+  if (kind === 'starik' || kind === 'staruha' || kind === 'babka') model.rotation.x = 0.06;
+  // v1.4: новые жители сказок
+  if (kind === 'tsarevich') { const cr = new THREE.Group(); acc.add(cr); cr.position.y = top; add(cr, new THREE.CylinderGeometry(hw * 0.8, hw * 0.85, 0.16, 10, 1, true), gold); for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; add(cr, new THREE.ConeGeometry(0.06, 0.24, 4), gold, Math.cos(a) * hw * 0.8, 0.18, Math.sin(a) * hw * 0.8); } }
+  if (kind === 'soldat') { add(acc, new THREE.CylinderGeometry(hw * 0.95, hw * 1.02, 0.26, 10), tm(0x3e6a3a), 0, top + 0.06, 0); add(acc, new THREE.CylinderGeometry(hw * 1.03, hw * 1.03, 0.08, 10), tm(0xc8302a), 0, top - 0.04, 0); add(acc, new THREE.BoxGeometry(0.5, 0.04, 0.22), tm(0x1a1410), 0, top - 0.06, hs.z * 0.5); // фуражка с козырьком
+    const ax = add(armR, new THREE.CylinderGeometry(0.04, 0.04, 0.9, 6), tm(0x8a5a2a), -0.2, -0.9, 0.4); ax.rotation.x = Math.PI / 2; add(ax, new THREE.BoxGeometry(0.06, 0.3, 0.32), tm(0xb8c0c8, { emissive: 0x101418 }), 0, -0.42, 0.1); }
+  if (kind === 'marya') { const steel = tm(0xc8d0d8, { emissive: 0x101418 }); add(acc, new THREE.CylinderGeometry(hw * 1.03, hw * 1.06, 0.2, 10), steel, 0, top * 0.92, 0); add(acc, new THREE.ConeGeometry(hw * 1.0, 0.5, 10), steel, 0, top + 0.24, 0); add(acc, new THREE.SphereGeometry(0.06, 6, 5), gold, 0, top + 0.52, 0);
+    const braid = new THREE.Group(); acc.add(braid); braid.position.set(0, top * 0.3, -0.44); for (let i = 0; i < 7; i++) add(braid, new THREE.SphereGeometry(0.12 - i * 0.006, 8, 6), tm(0x2a1a12), 0, -i * 0.17, -0.02 * i);
+    const cape = add(torso, new THREE.BoxGeometry(0.95, 1.6, 0.05), tm(0xc8302a), 0, 0.4, -0.34); cape.userData.cape = true; }
+  if (kind === 'solovei') { add(acc, new THREE.CylinderGeometry(hw * 1.0, hw * 1.12, 0.36, 10), tm(0x3a2a1a), 0, top + 0.08, 0); add(acc, new THREE.ConeGeometry(0.08, 0.3, 5), tm(0x6a8a3a), hw * 0.6, top + 0.35, 0).rotation.z = -0.5; }
+  if (kind === 'muzhik') { add(acc, new THREE.CylinderGeometry(hw * 0.9, hw * 1.0, 0.24, 10), tm(0x5a4a3a), 0, top + 0.05, 0); add(acc, new THREE.CylinderGeometry(hw * 1.35, hw * 1.35, 0.04, 12), tm(0x5a4a3a), 0, top - 0.06, 0); }
 
 
   const mixer = new THREE.AnimationMixer(model); const actions = {};

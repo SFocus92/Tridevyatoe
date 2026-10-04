@@ -7,6 +7,7 @@ import { initCharacters, makeChar, skinOf } from './characters.js';
 import { uLife, lifeify, lifeifyTree } from './life.js';
 import { initEvening, RETELL } from './evening.js';
 import { initExtra } from './extra.js';
+import { initTales } from './tales.js';
 window.__RET = RETELL;
 
 const S = new Sound();
@@ -138,7 +139,7 @@ function tree(x, z) {
   const pine = srand() < 0.5; const n = pine ? PINES[Math.floor(srand() * 4)] : LEAFY[Math.floor(srand() * 6)];
   const o = P(n, x, z, pine ? 4 + srand() * 2.5 : 4.5 + srand() * 2.5); colliders.push({ x, z, r: 0.6 }); camBlockers.push(o);
 }
-const ZONES = [[SWAMP, 12], [GROVE, 10], [PORTAL, 7], [FIRE, 6], [GARDEN, 10], [STONE, 5], [PIKE, 7], [V2(10, 13), 5], [MOUSE, 3], [V2(0, 0), 9]];
+const ZONES = [[SWAMP, 12], [GROVE, 10], [PORTAL, 7], [FIRE, 6], [GARDEN, 10], [STONE, 5], [PIKE, 7], [V2(10, 13), 5], [MOUSE, 3], [V2(0, 0), 9], [V2(18, 31), 8], [V2(-37, -8), 7], [V2(32, -4), 6], [V2(41, -14), 3.5]];
 const free = (x, z, extra = 0) => ZONES.every(([p, d]) => Math.hypot(x - p.x, z - p.y) > d + extra);
 for (let i = 0; i < 95; i++) { const a = srand() * 6.28, r = 12 + srand() * 33, x = Math.cos(a) * r, z = Math.sin(a) * r; if (!free(x, z)) continue; if (srand() < 0.3) birch(x, z); else tree(x, z); }
 for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; birch(GROVE.x + Math.cos(a) * 9, GROVE.y + Math.sin(a) * 9); }
@@ -840,13 +841,16 @@ async function teleport() {
   if (!st.pike) { ui.toast('Волшебных слов ты пока не знаешь…'); return; }
   if (ui.busy() || player.locked) return;
   document.exitPointerLock(); player.locked = true;
-  const list = region === LUK ? [...TP, ...(XT ? XT.tp() : [])] : [...(region.tp || []), ['Домой, в Лукоморье', null]];
+  const tlx = (f) => { try { return TL ? f() : []; } catch (e) { console.error('tales', e); return []; } };
+  const list = region === LUK ? [...TP, ...(XT ? XT.tp() : []), ...tlx(() => TL.tp())] : [...(region.tp || []), ...tlx(() => TL.tp()), ['Домой, в Лукоморье', null]];
+  list.push(...tlx(() => TL.menu()));
   if (st.extra && st.extra.carpet) { // ковёр-самолёт Царевны-лягушки: в любой открытый край
     const fly = [['forest', '🌲 Дремучий лес', st.restored], ['mount', '🏔 Ледяные горы', st.forest.done], ['river', '🌊 Молочные реки', st.mount.done], ['kosh', '💀 Царство Кощея', st.river.done], ['sea', '🐚 Морское царство', st.sea.met], ['bridge', '🔥 Калинов мост', st.sea.done && st.mount.done]];
     fly.forEach(([id, nm, ok]) => { if (ok && region.id !== id) list.push([`🧞 Ковёр-самолёт → ${nm}`, 'region:' + id]); });
   }
   const c = await ui.dialog('По щучьему велению', 'По щучьему велению, по моему хотению — хочу оказаться…', [...list.map((t) => t[0]), 'Остаться здесь']);
   if (c >= 0 && c < list.length) {
+    if (list[c][1] && list[c][1].act) { player.locked = false; await list[c][1].act(); return; }
     if (typeof list[c][1] === 'string') { player.locked = false; await travel(list[c][1].slice(7)); return; }
     if (!list[c][1]) { player.locked = false; await travel('luk', new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4)); return; }
     const fade = document.getElementById('fade'); fade.style.opacity = 1; S.chime(); await wait(700);
@@ -867,7 +871,7 @@ async function koloCatch() {
   }
   player.locked = false;
 }
-function objective() { return region === LUK ? lukObjective() : region.objective(); }
+function objective() { if (region === LUK) return lukObjective(); let o = null; try { o = TL && TL.objectiveRegion(region.id); } catch (e) { console.error('tales', e); } return o || region.objective(); }
 function lukObjective() {
   if (st.stage === 0) return [cat.position, 'к коту учёному у дуба'];
   if (st.stage === 1) {
@@ -888,6 +892,7 @@ function lukObjective() {
   if (!st.kosh.done) return [PORTAL3, 'через портал — в царство Кощея'];
   if (!st.finalTale) return [cat.position, 'к коту — сказка рассказана! Послушай его'];
   const xo = XT && XT.objective(); if (xo) return xo;
+  let to = null; try { to = TL && TL.objective(); } catch (e) { console.error('tales', e); } if (to) return to;
   return [cat.position, 'сказка рассказана! Гуляй по Тридевятому — или начни новую'];
 }
 async function koloTalk() { const [, txt] = objective(); await ui.say(KOLO, [`Покатили ${txt}! Я впереди.`]); }
@@ -1034,9 +1039,10 @@ if (isTouch) {
 }
 
 // ---------- трекер ----------
-const BOOK_TOTAL = 20, WORDS_TOTAL = 9; ui.totals = { book: BOOK_TOTAL, words: WORDS_TOTAL };
+const BOOK_TOTAL = 31, WORDS_TOTAL = 9; ui.totals = { book: BOOK_TOTAL, words: WORDS_TOTAL };
+const tlTr = (id) => { try { return TL ? TL.tracker(id) : ''; } catch (e) { console.error('tales', e); return ''; } };
 function trackerHtml() {
-  if (region !== LUK) return region.tracker() + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
+  if (region !== LUK) return region.tracker() + tlTr(region.id) + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
   const ck = (b) => (b ? '☑' : '☐');
   let h;
   if (st.stage === 0) h = '<b>📜 Пробуждение</b><br>• Поговори с Котом учёным у дуба (F)';
@@ -1045,7 +1051,7 @@ function trackerHtml() {
   else h = `<b>✨ Лукоморье ожило</b><br>${st.pushkin ? '☑' : '•'} Послушай кота${st.pushkin ? '' : ' (не ошибся ли он?)'}<br>${st.festival ? '🎉 Праздник! ' + (st.finalTale ? 'Сказка рассказана' : 'Послушай кота') : st.kosh.done ? '• Сказка почти рассказана' : '• Портал проснулся — шагни в него'}`;
   if (st.stage >= 1) {
     const nf = st.feathers.filter(Boolean).length;
-    h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7` + (XT ? XT.tracker() : '');
+    h += `<br><b style="font-size:13px">Побочные сказы</b><br>${ck(st.turnip === 3)} 🥕 Репка${st.turnip === 1 ? ' — найди мышку' : st.turnip === 2 ? ' — тяни!' : ''}<br>${ck(st.pike)} 🐟 Кто-то бьётся на берегу<br>${ck(st.kolobok)} 🟡 Догнать Колобка<br>${ck(nf === 7)} 🪶 Перья Жар-птицы ${nf}/7` + (XT ? XT.tracker() : '') + tlTr('luk');
   }
   return h + `<br><span style="opacity:.75;font-size:12px">Сказы: ${st.book.length}/${BOOK_TOTAL} · Слова: ${st.words.length}/${WORDS_TOTAL}</span>`;
 }
@@ -1080,7 +1086,7 @@ function update(dt) {
     if (keys.has('KeyW') || keys.has('ArrowUp')) iz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
     if (joy.id !== null) { ix += joy.x; iz += joy.y; }
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.85;
-    speed = (run ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1) * (p.hero === 'finist' ? 1.08 : p.hero === 'ilya' ? 0.94 : 1) * (p.slow > 0 ? 0.6 : 1) * (p.ride ? 1.75 : 1) * (Rg.swim && !p.onGround ? 0.9 : 1);
+    speed = (run ? 9.5 : 6) * (p.speedT > 0 ? 1.6 : 1) * (blocking ? 0.45 : 1) * (p.hero === 'finist' ? 1.08 : p.hero === 'ilya' ? 0.94 : 1) * (p.slow > 0 ? 0.6 : 1) * (p.ride ? 1.75 : 1) * (p.speedMul || 1) * (Rg.swim && !p.onGround ? 0.9 : 1);
     if (p.dashT > 0) speed = 26;
     if (ix || iz || p.dashT > 0) {
       let dx, dz;
@@ -1115,7 +1121,7 @@ function update(dt) {
   // герой: позиция и анимация
   const hr = hero.root; hr.position.copy(p.pos); hr.rotation.y = p.facing; hr.scale.setScalar(p.buffT > 0 ? 1.15 : 1);
   const swimming = Rg.swim && !p.onGround; hr.rotation.x += ((swimming ? (moving ? 1.05 : 0.25) : 0) - hr.rotation.x) * Math.min(1, dt * 6); if (swimming) hr.position.y += moving ? 0.6 : 0.15;
-  if (p.ride) hr.position.y += 0.95;
+  if (p.ride) hr.position.y += p.ride === 'wolf' ? 0.9 : 0.95;
   hr.visible = !(p.hidden > 0 && p.hiddenModel);
   if (!hero._busy) hero.play(p.ride ? 'sit' : swimming ? (moving ? 'walk' : 'idle') : !p.onGround ? (gliding ? 'holding-both' : 'sprint') : blocking ? 'holding-both' : moving ? (speed > 8 ? 'sprint' : 'walk') : 'idle');
   const anim = hero.cur; if (anim) anim.timeScale = swimming ? (moving ? 0.55 : 0.6) : !p.onGround && !gliding ? 0.4 : moving ? Math.max(0.8, speed / 7) : 1;
@@ -1131,7 +1137,7 @@ function update(dt) {
     if (e.dying > 0) { e.dying -= dt; e.g.scale.setScalar(Math.max(0.01, e.dying) * (e.scale || 1)); e.g.position.y += dt; if (e.dying <= 0) e.g.visible = false; continue; }
     if (!e.alive || !e.g.parent?.visible) continue;
     const d = p.pos.clone().sub(e.g.position); d.y = 0; const dist = d.length();
-    const aggro = !e.passive && dist < (e.aggroR || 13) && canMove && !(p.hidden > 0);
+    const aggro = !e.passive && dist < (e.aggroR || 13) * (p.stealthMul || 1) && canMove && !(p.hidden > 0);
     const target = aggro ? p.pos : e.home;
     const to = new THREE.Vector3(target.x - e.g.position.x, 0, target.z - e.g.position.z);
     if (!e.still && to.length() > (aggro ? (e.reach || 1.1) : 0.5)) { to.normalize().multiplyScalar((aggro ? (e.speed || 3.4) : 1.5) * dt); e.g.position.add(to); }
@@ -1194,6 +1200,7 @@ function update(dt) {
     if (st.festival) updateFestival(dt);
   } else Rg.update && Rg.update(dt, canMove);
   XT && XT.update(dt, canMove, inLuk);
+  if (TL) { try { TL.update(dt, canMove, inLuk); } catch (e) { console.error('tales', e); } }
 
   EV && EV.update(dt, inLuk);
   // камера
@@ -1272,10 +1279,10 @@ async function warmUp() { try { if (renderer.compileAsync) await renderer.compil
 async function ensureRegion(id) {
   if (REGIONS[id]) return REGIONS[id];
   const mod = await import(CHAPTERS[id]); const R = mod.default(ctx);
-  R.group.visible = false; scene.add(R.group); REGIONS[id] = R; R.init && R.init(); try { XT && XT.onRegion(id, R); } catch (e) { console.error('extra', e); } return R;
+  R.group.visible = false; scene.add(R.group); REGIONS[id] = R; R.init && R.init(); try { XT && XT.onRegion(id, R); } catch (e) { console.error('extra', e); } try { TL && TL.onRegion(id, R); } catch (e) { console.error('tales', e); } return R;
 }
 async function travel(id, pos) {
-  const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic(); XT && XT.dismount && XT.dismount(true);
+  const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic(); XT && XT.dismount && XT.dismount(true); TL && TL.dismount();
   await wait(loader.open ? 0 : 650);
   const needLoad = !REGIONS[id] && id !== 'luk'; if (needLoad && !loader.open) loader.show(id);
   if (needLoad) { loader.step(0.3); await new Promise((r) => setTimeout(r, 30)); } // дать экрану загрузки отрисоваться
@@ -1323,12 +1330,13 @@ const ctx = {
   T: () => T, life: () => life, lifeify, lifeifyTree, uLife, objective: () => objective(), makeTerrain, spawnEnemy, removeEnemies, lockPlayer: (v) => (player.locked = v),
   setLifeOverride: (v) => (lifeOverride = v), setCam: (v) => (camOverride = v), setFestival: (f) => (festivalUpd = f), outline, HERO_NAME, PORTAL3, LUK_PORTAL_POS: () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4),
   region: () => region, REGIONS, fade: (v) => (document.getElementById('fade').style.opacity = v), mouseBlock: () => mouseBlock || keys.has('KeyK'), V2, SKY, cat, catPet, OAK,
-  makeMermaid, makePike, lukH: H, MERMAID_GROUND, KIKI_POS, STONE3, FIRE3, PIKE3, mermaid, kiki, burstAt: burst, HERO_KEYS, nightTales: () => (st.nightTales || []), night: () => (EV ? EV.night() : 0), ringFx, teleport: () => teleport(), EV: () => EV, XT: () => XT,
+  makeMermaid, makePike, lukH: H, MERMAID_GROUND, KIKI_POS, STONE3, FIRE3, PIKE3, mermaid, kiki, burstAt: burst, HERO_KEYS, nightTales: () => (st.nightTales || []), night: () => (EV ? EV.night() : 0), ringFx, teleport: () => teleport(), EV: () => EV, XT: () => XT, TL: () => TL, hurtPlayerRaw: hurtPlayer,
 };
 
-let EV = null, XT = null;
+let EV = null, XT = null, TL = null;
 try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS, FIREBIRD_SEAT: FIREBIRD_SEAT.clone().add(OAK) }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
 try { XT = initExtra(ctx); } catch (e) { console.error('extra', e); XT = null; }
+try { TL = initTales(ctx); const ex0 = ui.extra; ui.extra = () => (ex0 ? ex0() : '') + TL.chestHtml(); } catch (e) { console.error('tales', e); TL = null; }
 // ---------- старт ----------
 async function startGame(cont) {
   if (started) return;
@@ -1340,7 +1348,7 @@ async function startGame(cont) {
   st.sea ||= {}; st.bridge ||= {}; st.extra ||= {};
   Object.values(heroes).forEach((h) => (h.root.visible = false)); player.hero = st.hero; heroes[st.hero].root.visible = true;
   life = lifeTarget = baseLife(); lifeShown = -1;
-  player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (st.heroes.includes('ilya') ? 1 : 0) + (EV ? EV.hpBonus() : 0) + (XT ? XT.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
+  player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (st.heroes.includes('ilya') ? 1 : 0) + (EV ? EV.hpBonus() : 0) + (XT ? XT.hpBonus() : 0) + (TL ? TL.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
   applyOpt(); spawnEnemies();
   const far = st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region);

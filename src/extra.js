@@ -122,8 +122,8 @@ export function initExtra(c) {
   // грива и хвост — чтобы олень стал конём
   { const mane = T3(0x3a2614); const m1 = M(new THREE.BoxGeometry(0.12, 0.35, 0.9), mane, 0, 1.55, 0.35, HR); m1.rotation.x = -0.5; const tl = M(new THREE.ConeGeometry(0.12, 0.8, 6), mane, 0, 1.0, -0.75, HR); tl.rotation.x = -2.4; HR.traverse((o) => { if (/antler|horn/i.test(o.name)) o.visible = false; }); }
   const SB = 'Сивка-Бурка', EL = 'Царевна Елена';
-  function mount() { player.ride = true; X().horseAt = null; S.stomp(); ui.toast('🐎 Ты на Сивке-Бурке! Скорость ×1.75, Пробел — богатырский прыжок. F (вдали от всех) — спешиться', false, 4000); }
-  function dismount(silent) { if (!player.ride) return; player.ride = false; const e = X(); const p = player.pos; e.horseAt = [p.x + Math.sin(player.facing + 1.6) * 1.6, p.z + Math.cos(player.facing + 1.6) * 1.6]; if (!inLuk()) e.horseAt = [HORSE_HOME.x, HORSE_HOME.z]; if (!silent) { c.save(); S.jump(); } }
+  function mount() { if (player.ride === 'wolf') c.TL?.()?.dismount(); player.ride = true; X().horseAt = null; S.stomp(); ui.toast('🐎 Ты на Сивке-Бурке! Скорость ×1.75, Пробел — богатырский прыжок. F (вдали от всех) — спешиться', false, 4000); }
+  function dismount(silent) { if (player.ride !== true) return; player.ride = false; const e = X(); const p = player.pos; e.horseAt = [p.x + Math.sin(player.facing + 1.6) * 1.6, p.z + Math.cos(player.facing + 1.6) * 1.6]; if (!inLuk()) e.horseAt = [HORSE_HOME.x, HORSE_HOME.z]; if (!silent) { c.save(); S.jump(); } }
   async function callHorse() {
     const e = X();
     if (e.sivka >= 2) { HR.visible = true; HR.position.copy(c.STONE3).add(new THREE.Vector3(2, 0, -2)); e.horseAt = [HR.position.x, HR.position.z]; S.stomp(); c.burst(HR.position.clone().setY(HR.position.y + 1), 0xffe27a, 40, 4, 1); await ui.say(SB, ['(Конь бежит — земля дрожит, из ушей дым столбом валит!) Здесь я, хозяин!']); return; }
@@ -242,9 +242,9 @@ export function initExtra(c) {
     { label: 'Позвать золотую рыбку', pos: () => CALL, r: 4.2, prio: 1, cond: () => inLuk() && X().fish && !X().fishEnd && X().want > X().wish, act: callFish },
     { label: 'Позвать Сивку-Бурку', pos: () => c.STONE3, r: 3.4, prio: 1, cond: () => inLuk() && !player.ride && (X().sivka >= 2 || (X().sivka === 0 && c.nightTales().includes('Сивка-Бурка'))), act: callHorse },
     { label: 'Сесть на Сивку-Бурку', pos: () => HR.position, r: 2.8, prio: 1, cond: () => inLuk() && HR.visible && !player.ride && X().sivka >= 1, act: async () => mount() },
-    { label: 'Спешиться', pos: () => player.pos, r: 1, prio: -40, cond: () => inLuk() && player.ride, act: async () => dismount() },
-    { label: 'Допрыгнуть до окошка царевны', pos: () => DOOR, r: 4.5, prio: 2, cond: () => inLuk() && player.ride && X().sivka === 1, act: teremJump },
-    { label: 'Поговорить с царевной в окошке', pos: () => DOOR, r: 4.5, cond: () => inLuk() && !(player.ride && X().sivka === 1), act: elenaTalk },
+    { label: 'Спешиться', pos: () => player.pos, r: 1, prio: -40, cond: () => inLuk() && player.ride === true, act: async () => dismount() },
+    { label: 'Допрыгнуть до окошка царевны', pos: () => DOOR, r: 4.5, prio: 2, cond: () => inLuk() && player.ride === true && X().sivka === 1, act: teremJump },
+    { label: 'Поговорить с царевной в окошке', pos: () => DOOR, r: 4.5, cond: () => inLuk() && !(player.ride === true && X().sivka === 1), act: elenaTalk },
     { label: 'Поднять стрелу на болоте', pos: () => ARROW, r: 3, prio: 1, cond: () => inLuk() && X().frog === 0 && c.nightTales().includes('Царевна-лягушка'), act: frogTalk },
     { label: 'Поговорить с Лягушкой в короне', pos: () => frog.position, r: 3, cond: () => inLuk() && X().frog === 1, act: frogTalk },
     { label: 'Поговорить с Василисой Прекрасной', pos: () => tsar.root.position, r: 3, cond: () => inLuk() && X().frog >= 2, act: tsarTalk },
@@ -280,7 +280,7 @@ export function initExtra(c) {
   function update(dt, canMove, luk) {
     const e = X(), T = c.T(), p = player;
     // конь
-    if (p.ride) { HR.visible = luk; HR.position.copy(p.pos); HR.rotation.y = p.facing; hp.play(p.walk > 0.3 && canMove ? 'walk' : 'idle'); if (hp.actions?.walk) hp.actions.walk.timeScale = 1.6; }
+    if (p.ride === true) { HR.visible = luk; HR.position.copy(p.pos); HR.rotation.y = p.facing; hp.play(p.walk > 0.3 && canMove ? 'walk' : 'idle'); if (hp.actions?.walk) hp.actions.walk.timeScale = 1.6; }
     else if (luk && e.sivka >= 1) { HR.visible = !!e.horseAt || e.sivka >= 1; if (e.horseAt) HR.position.set(e.horseAt[0], H(e.horseAt[0], e.horseAt[1]), e.horseAt[1]); else if (e.sivka >= 1 && !HR.userData.placed) { HR.position.copy(HORSE_HOME); } HR.userData.placed = true; hp.play('idle'); }
     else if (!p.ride && e.sivka === 0) HR.visible = HR.visible && luk;
     for (const [id, o] of Object.entries(spools)) { o.spool.visible = e.frog === 1 && !e.thr[id]; o.spool.rotation.y += dt * 1.5; } // нитки видны только во время сказки о Царевне-лягушке
