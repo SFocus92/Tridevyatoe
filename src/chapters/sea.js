@@ -260,7 +260,7 @@ export default function sea(ctx) {
     { const [op] = objective(); const p = player.pos; let tgt;
       if (s.stage === 0) tgt = SPAWN.clone().add(V(-3, -2, 2.6)); else { const d = V(op.x - p.x, op.z - p.z); const far = d.length() > 9; d.normalize(); tgt = p.clone().addScaledVector(far ? d : V(0.9, 0.45), far ? 4.5 : 4.4); tgt.y = Math.max(baseH(tgt.x, tgt.z) + 1.5, p.y + 2.1); }
       const prev = mer.position.clone(); mer.position.lerp(tgt, Math.min(1, dt * 1.6)); const mv = mer.position.clone().sub(prev); if (mv.lengthSq() > 1e-5) mer.rotation.y = Math.atan2(mv.x, mv.z);
-      mer.rotation.x = mv.length() > dt * 0.8 ? 0.9 : 0.1; mer.userData.tail.rotation.x = Math.sin(T * 4) * 0.35; }
+      mer.rotation.x = mv.length() > dt * 0.8 ? 0.9 : 0.1; mer.userData.tail.rotation.x = Math.sin(T * 4) * 0.35; if (mer.userData.head) mer.userData.head.rotation.x = -mer.rotation.x * 0.85; if (mer.userData.hair) mer.userData.hair.rotation.x = -0.15 + mer.rotation.x * 0.6 + Math.sin(T * 3) * 0.08; }
     // царь, Садко
     if (near(player.pos, king.root.position, 9)) { const d = player.pos.clone().sub(king.root.position); king.root.rotation.y = Math.atan2(d.x, d.z); } else king.root.rotation.y = 0;
     if (s.stage >= 5) { king.play('emote-yes'); king.root.position.y = throne.position.y + 0.7 + Math.abs(Math.sin(T * 3)) * 0.15; } else if (!ui.busy()) king.play('idle');

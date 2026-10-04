@@ -224,17 +224,53 @@ for (let i = 0; i < 16; i++) { const a = srand() * 6.28, r = 1 + srand() * 7; pl
 const KIKI_POS = new THREE.Vector3(SWAMP.x - 4, Math.max(H(SWAMP.x - 4, SWAMP.y + 3), 0.3), SWAMP.y + 3);
 
 // ---------- персонажи ----------
-function makeMermaid() {
+function makeMermaid() { // Русалка: лицо, золотые косы, жемчужный кокошник, рубаха, чешуйчатый хвост
   const g = new THREE.Group();
-  const skin = toon(0xf5d2b8), tailM = toon(0x26c2a8), hair = toon(0x3dd68c), shell = toon(0xff9ec7);
-  M(new THREE.CylinderGeometry(0.2, 0.28, 0.6, 10), skin, 0, 0.3, 0, g);
-  M(new THREE.SphereGeometry(0.24, 12, 10), skin, 0, 0.8, 0, g);
-  const h = M(new THREE.SphereGeometry(0.28, 12, 10), hair, 0, 0.82, -0.08, g); h.scale.set(1, 1.1, 1);
-  const hl = M(new THREE.CylinderGeometry(0.2, 0.32, 1.1, 8), hair, 0, 0.25, -0.18, g);
-  M(new THREE.SphereGeometry(0.09, 6, 6), shell, -0.1, 0.45, 0.17, g); M(new THREE.SphereGeometry(0.09, 6, 6), shell, 0.1, 0.45, 0.17, g);
-  const t = new THREE.Group(); t.position.y = 0; g.add(t);
-  M(new THREE.ConeGeometry(0.28, 1.6, 10), tailM, 0, -0.8, 0.05, t).rotation.x = Math.PI;
-  const fin = M(new THREE.ConeGeometry(0.3, 0.4, 3), tailM, 0, -1.65, 0.05, t); fin.scale.z = 0.3;
+  const skin = toon(0xf6d6c0), blouse = toon(0xbfe8d2), trim = toon(0x2f9a8a), pearl = toon(0xfff6ea, { emissive: 0x2a2620 });
+  const hair = toon(0xf0c060), hair2 = toon(0xd89a3a), tailM = toon(0x26b8a0), tailM2 = toon(0x1f8f8a), finM = toon(0x7fe0d0, { transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+  const eyeW = toon(0xffffff), eyeI = toon(0x2a6a9a), dark = toon(0x2a1a14), cheek = toon(0xff9aa8), lip = toon(0xd8566a), kok = toon(0x3fb8a0, { emissive: 0x0a2a24 });
+  // туловище в рубахе, жемчужное ожерелье и пояс
+  M(new THREE.CylinderGeometry(0.17, 0.26, 0.62, 12), blouse, 0, 0.3, 0, g);
+  M(new THREE.TorusGeometry(0.255, 0.035, 6, 16), trim, 0, 0.02, 0, g).rotation.x = Math.PI / 2;
+  for (let i = 0; i < 7; i++) { const a = -1.1 + i * 0.37; M(new THREE.SphereGeometry(0.03, 6, 5), pearl, Math.sin(a) * 0.16, 0.56 - Math.cos(a) * 0.05, Math.cos(a) * 0.16, g); }
+  M(new THREE.CylinderGeometry(0.07, 0.08, 0.12, 8), skin, 0, 0.64, 0, g); // шея
+  // руки в рукавах
+  for (const sx of [-1, 1]) { const arm = new THREE.Group(); arm.position.set(sx * 0.22, 0.52, 0); arm.rotation.z = sx * 0.35; arm.rotation.x = -0.45; g.add(arm);
+    M(new THREE.CylinderGeometry(0.06, 0.075, 0.42, 8), blouse, 0, -0.2, 0, arm); M(new THREE.TorusGeometry(0.062, 0.018, 5, 10), trim, 0, -0.4, 0, arm).rotation.x = Math.PI / 2; M(new THREE.SphereGeometry(0.055, 8, 6), skin, 0, -0.46, 0, arm); }
+  // голова и лицо (+z — вперёд)
+  const head = new THREE.Group(); head.position.y = 0.86; g.add(head); g.userData.head = head;
+  M(new THREE.SphereGeometry(0.23, 16, 12), skin, 0, 0, 0, head);
+  for (const sx of [-1, 1]) {
+    const w = M(new THREE.SphereGeometry(0.052, 10, 8), eyeW, sx * 0.085, 0.02, 0.19, head); w.scale.set(1, 1.15, 0.5);
+    M(new THREE.SphereGeometry(0.034, 8, 6), eyeI, sx * 0.085, 0.015, 0.212, head).scale.z = 0.5;
+    M(new THREE.SphereGeometry(0.018, 6, 5), dark, sx * 0.085, 0.015, 0.226, head).scale.z = 0.5;
+    M(new THREE.SphereGeometry(0.009, 4, 4), eyeW, sx * 0.085 + 0.012, 0.03, 0.232, head);
+    const br = M(new THREE.BoxGeometry(0.075, 0.012, 0.012), hair2, sx * 0.085, 0.085, 0.205, head); br.rotation.z = -sx * 0.18;
+    const lash = M(new THREE.BoxGeometry(0.07, 0.01, 0.01), dark, sx * 0.085, 0.062, 0.21, head); lash.rotation.z = -sx * 0.1;
+    const ck = M(new THREE.SphereGeometry(0.04, 8, 6), cheek, sx * 0.13, -0.06, 0.165, head); ck.scale.set(1, 0.6, 0.35);
+  }
+  M(new THREE.SphereGeometry(0.022, 6, 5), skin, 0, -0.03, 0.225, head); // носик
+  const sm = M(new THREE.TorusGeometry(0.04, 0.01, 4, 10, Math.PI), lip, 0, -0.095, 0.205, head); sm.rotation.z = Math.PI; // улыбка
+  // волосы: шапочка сзади и сверху, чёлка, длинные пряди по спине и две косы спереди
+  const cap = M(new THREE.SphereGeometry(0.25, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.42), hair, 0, 0.005, -0.01, head); cap.rotation.x = -0.32;
+  const back = M(new THREE.SphereGeometry(0.245, 14, 10, Math.PI * 0.5, Math.PI, 0, Math.PI * 0.8), hair, 0, -0.01, -0.03, head);
+  for (let i = 0; i < 5; i++) { const x = -0.12 + i * 0.06; const b = M(new THREE.BoxGeometry(0.075, 0.07, 0.05), hair, x, 0.16 - Math.abs(x) * 0.5, 0.17 - Math.abs(x) * 0.4, head); b.rotation.x = 0.5; b.rotation.z = -x * 1.5; }
+  const flow = new THREE.Group(); flow.position.set(0, 0.8, -0.16); g.add(flow); g.userData.hair = flow;
+  for (let i = 0; i < 5; i++) { const x = -0.14 + i * 0.07; const st = M(new THREE.CylinderGeometry(0.06, 0.025, 0.85, 7), i % 2 ? hair2 : hair, x, -0.4, -0.02 - Math.abs(x) * 0.15, flow); st.rotation.x = 0.12; st.rotation.z = x * 0.6; }
+  for (const sx of [-1, 1]) { const br = new THREE.Group(); br.position.set(sx * 0.19, 0.78, 0.06); g.add(br); for (let k = 0; k < 7; k++) M(new THREE.SphereGeometry(0.058 - k * 0.005, 8, 6), k % 2 ? hair2 : hair, sx * 0.008 * k, -k * 0.065, 0.018 * k, br); M(new THREE.SphereGeometry(0.03, 6, 5), pearl, sx * 0.05, -0.48, 0.13, br); }
+  // жемчужный кокошник — полукруг над чёлкой, по краю жемчуг
+  const kg = new THREE.Group(); kg.position.set(0, 0.12, 0.05); kg.rotation.x = -0.22; head.add(kg);
+  M(new THREE.CircleGeometry(0.25, 24, 0, Math.PI), toon(0x3fb8a0, { emissive: 0x0a2a24, side: THREE.DoubleSide }), 0, 0, 0, kg);
+  M(new THREE.CircleGeometry(0.17, 20, 0, Math.PI), toon(0xffe08a, { emissive: 0x2a2008, side: THREE.DoubleSide }), 0, 0.005, 0.006, kg);
+  for (let i = 0; i < 11; i++) { const a = 0.06 * Math.PI + i * (0.88 * Math.PI / 10); M(new THREE.SphereGeometry(0.022, 6, 5), pearl, Math.cos(a) * 0.25, Math.sin(a) * 0.25, 0.012, kg); }
+  M(new THREE.SphereGeometry(0.038, 8, 6), toon(0xff7aa8, { emissive: 0x3a0a1a }), 0, 0.1, 0.02, kg);
+  // хвост: цепочка чешуйчатых колец, плавно изгибается вперёд, на конце — плавник
+  const t = new THREE.Group(); g.add(t); let par = t;
+  for (let k = 0; k < 7; k++) { const r0 = 0.27 - k * 0.032, r1 = 0.27 - (k + 1) * 0.032; const j = new THREE.Group(); j.position.y = k ? -0.24 : 0; j.rotation.x = k ? 0.2 : 0.1; j.rotation.z = k ? 0.04 : 0; par.add(j); par = j;
+    M(new THREE.CylinderGeometry(r0, r1, 0.25, 12), k % 2 ? tailM2 : tailM, 0, -0.12, 0, j); M(new THREE.TorusGeometry(r1 + 0.004, 0.014, 5, 14), trim, 0, -0.24, 0, j).rotation.x = Math.PI / 2; }
+  const fl = new THREE.Group(); fl.position.y = -0.26; fl.rotation.x = 0.35; par.add(fl);
+  for (const sx of [-1, 1]) { const f = M(new THREE.ConeGeometry(0.17, 0.46, 4), finM, sx * 0.15, -0.12, 0, fl); f.rotation.z = sx * 2.3; f.scale.z = 0.25; }
+  for (const sx of [-1, 1]) { const f = M(new THREE.ConeGeometry(0.08, 0.28, 4), finM, sx * 0.27, -0.25, 0.02, t); f.rotation.z = sx * 2.6; f.scale.z = 0.3; } // боковые плавнички
   g.userData.tail = t; return g;
 }
 function makeKiki() {
@@ -1143,7 +1179,7 @@ function update(dt) {
     if (Math.random() < dt * 4) burst(FIRE3.clone().setY(FIRE3.y + 1.2), 0xffa040, 3, 1.2, 1, 0.12);
     portalDisc.rotation.z += dt; swirl.rotation.z -= dt * 2;
     if (st.restored) { portalMat.color.lerp(new THREE.Color(0x2f9e5a), dt); portalMat.opacity = Math.min(0.75, portalMat.opacity + dt * 0.3); swirl.material.opacity = Math.min(0.9, swirl.material.opacity + dt * 0.3); }
-    mermaid.userData.tail.rotation.x = Math.sin(T * 1.6) * 0.25;
+    mermaid.userData.tail.rotation.x = Math.sin(T * 1.6) * 0.25; if (mermaid.userData.hair) mermaid.userData.hair.rotation.x = Math.sin(T * 1.1) * 0.06; if (mermaid.userData.head) mermaid.userData.head.rotation.y = Math.sin(T * 0.5) * 0.25;
     kiki.position.y = KIKI_POS.y + Math.sin(T * 1.2) * 0.05; if (kiki.userData.giggle > 0) { kiki.userData.giggle -= dt; kiki.rotation.z = Math.sin(T * 30) * 0.08; } else kiki.rotation.z = 0;
     if (st.restored && !ui.dialogOpen && !st.festival) {
       const a = T * 0.35; const rr = 2.7; cat.position.set(Math.cos(a) * rr, 0, Math.sin(a) * rr); cat.position.y = H(cat.position.x, cat.position.z); cat.rotation.y = -a; catPet.play('walk');
