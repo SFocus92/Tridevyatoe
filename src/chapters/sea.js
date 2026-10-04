@@ -258,7 +258,7 @@ export default function sea(ctx) {
     if (!ctx.st.extra?.fish) { gfish.rotation.z = Math.sin(T * 7) * 0.4; gfish.userData.tail.rotation.y = Math.sin(T * 12) * 0.6; } else { netG.visible = true; netG.userData.net.visible = false; gfish.position.set(Math.cos(T * 0.8) * 2.5, Math.sin(T * 1.3) * 0.6, Math.sin(T * 0.8) * 2.5); gfish.rotation.y = -T * 0.8; }
     // Русалка-проводник: плывёт чуть впереди к цели
     { const [op] = objective(); const p = player.pos; let tgt;
-      if (s.stage === 0) tgt = SPAWN.clone().add(V(-3, -2, 2.6)); else { const d = V(op.x - p.x, op.z - p.z); const far = d.length() > 9; d.normalize(); tgt = p.clone().addScaledVector(far ? d : V(1, 0.5), far ? 4.5 : 2.6); tgt.y = Math.max(baseH(tgt.x, tgt.z) + 1.5, p.y + 1.6); }
+      if (s.stage === 0) tgt = SPAWN.clone().add(V(-3, -2, 2.6)); else { const d = V(op.x - p.x, op.z - p.z); const far = d.length() > 9; d.normalize(); tgt = p.clone().addScaledVector(far ? d : V(0.9, 0.45), far ? 4.5 : 4.4); tgt.y = Math.max(baseH(tgt.x, tgt.z) + 1.5, p.y + 2.1); }
       const prev = mer.position.clone(); mer.position.lerp(tgt, Math.min(1, dt * 1.6)); const mv = mer.position.clone().sub(prev); if (mv.lengthSq() > 1e-5) mer.rotation.y = Math.atan2(mv.x, mv.z);
       mer.rotation.x = mv.length() > dt * 0.8 ? 0.9 : 0.1; mer.userData.tail.rotation.x = Math.sin(T * 4) * 0.35; }
     // царь, Садко

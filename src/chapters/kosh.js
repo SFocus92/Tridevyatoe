@@ -170,7 +170,7 @@ export default function kosh(ctx) {
       const T = ctx.T(); ring.forEach((r) => { const a = r.a + T * 0.25; const x = Math.cos(a) * 9, z = Math.sin(a) * 9; r.c.root.position.set(x, ctx.REGIONS.luk.H(x, z), z); r.c.root.rotation.y = -a; });
       fwT -= dt; if (fwT < 0) { fwT = 0.7 + Math.random(); const p = V((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 40, 18 + Math.random() * 10); burst(p, [0xffd23f, 0xff5a7a, 0x7affc8, 0x9fb8ff][Math.floor(Math.random() * 4)], 70, 9, 1.6, 0.4); S.bell && S.bell(600 + Math.random() * 600, 0, 0.05, 1.5, 'sfx'); }
     });
-    ui.toast('🎉 Праздник в Лукоморье! Поговори с Котом учёным.', true, 5000);
+    if (ctx.region().id === 'luk') ui.toast('🎉 Праздник в Лукоморье! Поговори с Котом учёным.', true, 5000);
   }
   // ---- интерактив ----
   fakes.forEach((f) => interactables.push({ label: player.sight ? 'Развеять морок' : 'Поговорить с Иваном', get labelX() { return 0; }, pos: () => f.c.root.position, r: 2.8, cond: () => st().stage >= 1 && f.c.root.visible, act: () => fakeTalk(f) }));

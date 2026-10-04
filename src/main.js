@@ -1208,6 +1208,31 @@ function setRegion(id) {
   sea.visible = R.water !== false; sun.intensity = R.sun ?? 2.3;
   S.setTheme(R.music); S.setAmbience(R.amb || {}); lifeShown = -1; lastMM = -1;
 }
+// ---------- экран загрузки края (вместо тёмного экрана при «Продолжить» и переходах) ----------
+const REGION_TITLE = { luk: 'Лукоморье', forest: 'Дремучий лес', mount: 'Ледяные горы', river: 'Молочные реки', kosh: 'Царство Кощея', sea: 'Морское царство', bridge: 'Калинов мост' };
+const LD_HINTS = ['Кот учёный открывает Книгу Сказов…', 'Нити Сказа сплетаются в дорогу…', 'Русалка показывает путь…', 'Ветер переворачивает страницы…', 'Сказка вспоминает, где ты остановился…', 'Жар-птица освещает тропинку…', 'Избушка поворачивается к лесу задом…', 'Златая цепь звенит…'];
+const loader = (() => {
+  const el = document.getElementById('loader'), fill = el.querySelector('.loadBar i'), hint = document.getElementById('ldHint');
+  let iv = 0, hi = 0, p = 0, pv = 0, shownAt = 0;
+  return {
+    get open() { return !el.classList.contains('hidden'); },
+    show(id, title = 'Переносимся в край…') {
+      document.getElementById('ldTitle').textContent = title; document.getElementById('ldName').textContent = REGION_TITLE[id] || 'Тридевятое царство';
+      hi = Math.floor(Math.random() * LD_HINTS.length); hint.textContent = LD_HINTS[hi]; p = 0.08; fill.style.setProperty('--p', '8%');
+      el.classList.remove('hidden'); void el.offsetWidth; el.classList.add('on'); shownAt = performance.now();
+      clearInterval(iv); clearInterval(pv);
+      iv = setInterval(() => { hi = (hi + 1) % LD_HINTS.length; hint.style.opacity = 0; setTimeout(() => { hint.textContent = LD_HINTS[hi]; hint.style.opacity = 1; }, 300); }, 2400);
+      pv = setInterval(() => { p += (0.9 - p) * 0.06; fill.style.setProperty('--p', Math.round(p * 100) + '%'); }, 120); // плавно ползёт, пока край строится
+    },
+    step(k) { p = Math.max(p, k); fill.style.setProperty('--p', Math.round(p * 100) + '%'); },
+    async hide() {
+      if (!this.open) return; this.step(1); const min = 700 - (performance.now() - shownAt); if (min > 0) await wait(min);
+      clearInterval(iv); clearInterval(pv); el.classList.remove('on'); setTimeout(() => { if (!el.classList.contains('on')) el.classList.add('hidden'); }, 500);
+    },
+  };
+})();
+// прогреть шейдеры и текстуры, чтобы первый кадр не был тёмным и без рывка
+async function warmUp() { try { if (renderer.compileAsync) await renderer.compileAsync(scene, camera); else renderer.compile(scene, camera); } catch (e) { /* не страшно */ } await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); }
 async function ensureRegion(id) {
   if (REGIONS[id]) return REGIONS[id];
   const mod = await import(CHAPTERS[id]); const R = mod.default(ctx);
@@ -1215,15 +1240,18 @@ async function ensureRegion(id) {
 }
 async function travel(id, pos) {
   const fade = document.getElementById('fade'); const wasLocked = player.locked; player.locked = true; fade.style.opacity = 1; toggleSight(false); S.magic(); XT && XT.dismount && XT.dismount(true);
-  await wait(650);
-  let R; try { R = await ensureRegion(id); } catch (e) { console.error(e); ui.toast('Эта сказка ещё не написана…'); fade.style.opacity = 0; player.locked = wasLocked; return; }
+  await wait(loader.open ? 0 : 650);
+  const needLoad = !REGIONS[id] && id !== 'luk'; if (needLoad && !loader.open) loader.show(id);
+  if (needLoad) { loader.step(0.3); await new Promise((r) => setTimeout(r, 30)); } // дать экрану загрузки отрисоваться
+  let R; try { R = await ensureRegion(id); } catch (e) { console.error(e); ui.toast('Эта сказка ещё не написана…'); fade.style.opacity = 0; player.locked = wasLocked; loader.hide(); return; }
+  if (loader.open) loader.step(0.75);
   setRegion(id);
   const sp = pos || R.spawn(); player.pos.set(sp.x, Math.max(R.H(sp.x, sp.z), R.water === false ? -99 : 0.05), sp.z); player.vy = 0; player.onGround = true;
   camYaw = Math.atan2(sp.x - R.center.x, sp.z - R.center.y); camPitch = 0.3; player.facing = camYaw + Math.PI;
   if (id === 'luk' && pos) { camYaw = Math.atan2(sp.x, sp.z); player.facing = camYaw + Math.PI; }
   camera.position.set(sp.x + Math.sin(camYaw) * 8, player.pos.y + 4, sp.z + Math.cos(camYaw) * 8);
   life = lifeTarget = id === 'luk' ? baseLife() : R.life(); lifeShown = -1;
-  save(); await wait(250); fade.style.opacity = 0; player.locked = wasLocked;
+  save(); if (loader.open) { await warmUp(); await loader.hide(); } else await wait(250); fade.style.opacity = 0; player.locked = wasLocked;
   ui.toast(R.name, true, 2600);
   R.onEnter && R.onEnter();
 }
@@ -1266,7 +1294,8 @@ let EV = null, XT = null;
 try { EV = initEvening(ctx, { OPT, H, FIRE3, sun, hemi, SUN_LIVE, MERMAID_GROUND, KIKI_POS, FIREBIRD_SEAT: FIREBIRD_SEAT.clone().add(OAK) }); ui.extra = () => EV.bookHtml(); } catch (e) { console.error('evening', e); EV = null; }
 try { XT = initExtra(ctx); } catch (e) { console.error('extra', e); XT = null; }
 // ---------- старт ----------
-function startGame(cont) {
+async function startGame(cont) {
+  if (started) return;
   S.init();
   if (cont) { try { st = Object.assign(freshState(), JSON.parse(localStorage.getItem(SAVE_KEY))); } catch { st = freshState(); } }
   else { st = freshState(); save(); }
@@ -1278,11 +1307,14 @@ function startGame(cont) {
   player.maxHp = 5 + (st.turnip === 3 ? 1 : 0) + (st.heroes.includes('finist') ? 1 : 0) + (st.heroes.includes('ilya') ? 1 : 0) + (EV ? EV.hpBonus() : 0) + (XT ? XT.hpBonus() : 0); player.hp = player.maxHp; EV && EV.applyCharms();
   if (st.kolobok) kolobok.position.set(player.pos.x + 2, 0, player.pos.z);
   applyOpt(); spawnEnemies();
-  if (st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region)) { travel(st.region); } else { st.region = 'luk'; setRegion('luk'); }
-  if (st.festival) ensureRegion('kosh').then((R) => R.startFestival && R.startFestival());
+  const far = st.region && st.region !== 'luk' && CHAPTER_READY.has(st.region);
+  if (cont) loader.show(far ? st.region : 'luk', 'Возвращаемся в сказку…'); // сразу экран загрузки, а не тёмный мир с кнопками
+  await new Promise((r) => setTimeout(r, 40));
   document.getElementById('title').classList.add('hidden');
-  document.getElementById('hud').classList.remove('hidden');
   started = true;
+  if (far) { await travel(st.region); } else { st.region = 'luk'; setRegion('luk'); if (cont) { loader.step(0.7); await warmUp(); await loader.hide(); } }
+  if (st.festival) ensureRegion('kosh').then((R) => R.startFestival && R.startFestival());
+  document.getElementById('hud').classList.remove('hidden');
   if (!cont) setTimeout(() => ui.toast('Ты просыпаешься на берегу Лукоморья. Всё вокруг серое…', false, 4000), 600);
 }
 document.getElementById('btnNew').onclick = () => startGame(false);
