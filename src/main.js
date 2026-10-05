@@ -1,7 +1,7 @@
 // Тридевятое: Сказитель — вертикальный срез (Лукоморье · Иван · «Цепь златая»)
 import * as THREE from 'three';
 import { Sound } from './audio.js';
-import { UI } from './ui.js';
+import { UI, cleanName } from './ui.js';
 import { loadModels, place, instanced, loadKits } from './assets.js';
 import { initCharacters, makeChar, skinOf } from './characters.js';
 import { uLife, lifeify, lifeifyTree } from './life.js';
@@ -582,6 +582,11 @@ async function catTalk() {
   if (st.stage === 0) {
     await ui.say(CAT, [
       'Мяу… то есть, здравствуй. Проснулся? Значит, ты — Сказитель.',
+    ]);
+    { const nm = await ui.askName(CAT, 'А как тебя зовут, Сказитель? Напиши своё имя.', st.name || '');
+      st.name = nm || ''; save();
+      await ui.say(CAT, [nm ? `${nm}! Какое славное имя. Так и буду тебя звать.` : 'Не хочешь говорить? Ничего — буду звать тебя Сказителем.']); }
+    await ui.say(CAT, [
       'Я Кот учёный. Днём и ночью я ходил по цепи кругом… а теперь сижу и не помню, куда идти. Цепь порвана.',
       'Кощей крадёт у мира память о сказках. Видишь — всё серое и тихое. Даже я забываю свои песни.',
       'Ты умеешь вселяться в героев. Сейчас ты — Иван. Простой, зато сердце доброе.',
@@ -985,11 +990,14 @@ function applyQuality() {
   scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.needsUpdate = true)); });
   renderer.setSize(innerWidth, innerHeight);
 }
+ui.playerName = () => st.name || '';
+{ const el = document.getElementById('optName'); if (el) { el.addEventListener('keydown', (e) => e.stopPropagation()); el.addEventListener('keyup', (e) => e.stopPropagation());
+  el.addEventListener('focus', () => (el.value = st.name || '')); el.addEventListener('change', () => { st.name = cleanName(el.value); el.value = st.name; save(); }); } }
 function applyOpt() {
   sens = OPT.sens; S.vol.master = OPT.master; S.vol.music = OPT.music; S.vol.sfx = OPT.sfx; S.applyVolumes();
   document.getElementById('help').classList.toggle('hidden', !OPT.help || isTouch);
 }
-function toggleSettings(open) { settingsEl.classList.toggle('hidden', !open); ui.bookOpen = open; if (open) document.exitPointerLock(); }
+function toggleSettings(open) { settingsEl.classList.toggle('hidden', !open); ui.bookOpen = open; if (open) { document.exitPointerLock(); const n = document.getElementById('optName'); if (n) n.value = st.name || ''; } }
 document.getElementById('btnGear').onclick = () => toggleSettings(true);
 document.getElementById('optClose').onclick = () => toggleSettings(false);
 document.getElementById('optX').onclick = () => toggleSettings(false);

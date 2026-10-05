@@ -139,3 +139,15 @@ body.touch #tracker::before{content:'';position:absolute;top:6px;right:8px;width
 body.touch #tracker::after{content:'';position:absolute;top:13px;right:15.5px;width:7px;height:7px;border-left:2px solid #ffd76a;border-top:2px solid #ffd76a;transform:rotate(45deg)}
 body.touch #tracker.collapsed{max-height:31px;overflow:hidden;padding-bottom:0}
 body.touch #tracker.collapsed::after{top:10px;transform:rotate(225deg)}
+
+/* v1.4.2: красные сердечки и окно имени */
+.hrt{width:22px;height:22px;fill:#e5383b;vertical-align:middle;margin-right:2px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
+.hrt.off{fill:rgba(255,255,255,.08);stroke:#e5383b;stroke-width:1.4;opacity:.55;filter:none}
+body.touch .hrt{width:17px;height:17px}
+#nameBox{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(10,6,2,.45)}
+#nameBox .nbIn{background:rgba(40,26,12,.95);border:2px solid #ffd76a;border-radius:14px;padding:18px 22px;max-width:min(420px,90vw);text-align:center}
+#nameBox b{color:#ffd76a;font-size:18px}#nameBox p{margin:8px 0 12px}
+#nameBox input,#settings #optName{font:inherit;font-size:20px;padding:8px 12px;border-radius:8px;border:2px solid #c9a24a;background:#fff8e6;color:#3a2410;width:100%;max-width:260px;text-align:center}
+#settings #optName{font-size:16px;padding:4px 8px;width:180px;margin-left:8px}
+#nameBox button{font:inherit;font-size:16px;margin-top:12px;padding:8px 16px;border-radius:10px;border:2px solid #ffd76a;background:#6b3a12;color:#fff8e6;cursor:pointer}
+#nameBox button.muted{background:transparent;opacity:.8;font-size:14px}

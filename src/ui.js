@@ -10,6 +10,13 @@ export function touchText(t) {
     .replace(/[Пп]робел/g, (m) => (m[0] === 'П' ? 'Кнопка ⤴' : 'кнопка ⤴'))
     .replace(/ЛКМ\/J|ЛКМ/g, '⚔').replace(/ПКМ\/K|ПКМ/g, '🛡');
 }
+const HEART = (on) => `<svg class="hrt${on ? '' : ' off'}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+// v1.4.2: имя игрока — подставляется вместо обращения «Сказитель» (только в обращениях: «Спасибо, Сказитель!», «Сказитель, выручи!»)
+export function cleanName(s) { s = String(s || '').replace(/[^A-Za-zА-Яа-яЁё\- ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16); return s ? s[0].toUpperCase() + s.slice(1) : ''; }
+export function personal(text, name) {
+  if (!name || typeof text !== 'string') return text;
+  return text.replace(/(^|[,!?.…(] )Сказитель(?=[,.!?…:)]|$)/g, (m, a) => a + name).replace(/^Сказитель(?=[,!])/g, name);
+}
 export class UI {
   constructor() {
     this.$ = (id) => document.getElementById(id);
@@ -18,10 +25,30 @@ export class UI {
     window.addEventListener('keydown', (e) => this._key(e));
     this.$('dialog').addEventListener('click', (e) => { if (e.target.tagName !== 'BUTTON') this._advance(); });
   }
+  // окошко «Как тебя зовут?» — ребёнок вводит имя; пустое — остаётся «Сказитель»
+  askName(speaker, question, cur = '') {
+    return new Promise((res) => {
+      try { document.exitPointerLock && document.exitPointerLock(); } catch {}
+      this.dialogOpen = true; document.body.classList.add('dlg');
+      const box = document.createElement('div'); box.id = 'nameBox';
+      box.innerHTML = `<div class="nbIn"><b></b><p></p><input id="nameIn" maxlength="16" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Твоё имя"><div><button id="nameOk">Это я!</button> <button id="nameSkip" class="muted">Зови Сказителем</button></div></div>`;
+      box.querySelector('b').textContent = speaker; box.querySelector('p').textContent = question;
+      document.body.appendChild(box);
+      const inp = box.querySelector('#nameIn'); inp.value = cur;
+      const done = (v) => { box.remove(); this.dialogOpen = false; document.body.classList.remove('dlg'); res(cleanName(v)); };
+      inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') done(inp.value); });
+      inp.addEventListener('keyup', (e) => e.stopPropagation());
+      box.querySelector('#nameOk').onclick = () => done(inp.value);
+      box.querySelector('#nameSkip').onclick = () => done('');
+      setTimeout(() => inp.focus(), 50);
+    });
+  }
   busy() { return this.dialogOpen || this.bookOpen; }
   set(id, html) { if (this._cache[id] !== html) { this._cache[id] = html; this.$(id).innerHTML = html; } }
   hud(p, label) {
-    this.set('hearts', '❤'.repeat(Math.max(0, p.hp)) + '<span style="opacity:.25">' + '❤'.repeat(Math.max(0, p.maxHp - p.hp)) + '</span>');
+    // v1.4.2: сердечки — SVG, всегда красные на любом устройстве; потерянные — прозрачные с красным контуром
+    const hk = p.hp + '/' + p.maxHp;
+    if (this._cache.hk !== hk) { this._cache.hk = hk; this.$('hearts').innerHTML = HEART(true).repeat(Math.max(0, p.hp)) + HEART(false).repeat(Math.max(0, p.maxHp - p.hp)); }
     const w = Math.round(p.word);
     if (this._cache.w !== w) { this._cache.w = w; this.$('word').style.width = w + '%'; }
     this.set('luck', touchText(label || ''));
@@ -29,12 +56,13 @@ export class UI {
   tracker(html) { this.set('tracker', touchText(html)); }
   prompt(text) { const el = this.$('prompt'); if (this._cache.prompt !== text) { this._cache.prompt = text; el.textContent = touchText(text) || ''; el.style.display = text ? 'block' : 'none'; } }
   toast(text, big = false, ms = 2600) {
-    const d = document.createElement('div'); d.className = 'toast' + (big ? ' big' : ''); d.textContent = text;
+    const d = document.createElement('div'); d.className = 'toast' + (big ? ' big' : ''); d.textContent = personal(text, this.playerName ? this.playerName() : '');
     this.$('toasts').appendChild(d); setTimeout(() => d.remove(), ms);
   }
   dialog(speaker, text, choices = null) {
     this.dialogOpen = true; this._openedAt = performance.now(); document.body.classList.add('dlg');
-    text = touchText(text); if (choices) choices = choices.map(touchText);
+    const nm = this.playerName ? this.playerName() : '';
+    text = personal(touchText(text), nm); if (choices) choices = choices.map((c) => personal(touchText(c), nm));
     // озвучка: текст печатается в темпе голоса (начинает, когда голос зазвучал, и подтягивается по словам), а не убегает вперёд
     const sync = { on: false, started: false, said: 0, end: false };
     try { sync.on = !!(this.onSpeak && this.onSpeak(speaker, text, { start: () => (sync.started = true), word: (k) => { sync.got = true; sync.said = Math.max(sync.said, k); }, end: () => (sync.end = true) })); } catch {}
