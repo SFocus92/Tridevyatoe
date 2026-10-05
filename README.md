@@ -107,6 +107,7 @@ F — действие (у костра: ночь, сон, сказка на н�
 - `src/characters.js` — герои на модели Kenney Blocky Characters со своими скинами (`tools/skins.py`) и 3D-аксессуарами.
 - `src/audio.js` — музыка (гусли, балалайка, дудочка, колокольчики) и звуки в Web Audio. Свои темы у каждого края и у боссов; фоновые темы играют из `assets/music/*.mp3`.
 - `tools/render_music.js` — перерендер тем из `src/audio.js` в mp3 (`node tools/render_music.js` при запущенном сервере на :8765; нужны playwright, chromium, ffmpeg). После перерендера поменяйте версию кэша в `sw.js` и длины в `MUSIC_LEN`.
+- `tools/agent.md` — памятка для будущих агентов и разработчиков: что где лежит, правила, как тестировать и выпускать. `tools/test/` — тестовый запускатель Playwright, бот-проходчик и дымовой тест.
 - `sw.js` — кэш музыки, моделей и three.js (работает на https, напр. GitHub Pages).
 - Запуск локально: `python3 -m http.server` в папке проекта → http://localhost:8000
 
