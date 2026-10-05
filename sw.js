@@ -1,6 +1,6 @@
 // Тридевятое — кэш для офлайна и быстрых повторных запусков.
 // assets/ и vendor/ (музыка, модели, Three.js) — сначала из кэша; код и страницы — сначала из сети (обновления приходят сразу).
-const CACHE = 'tridevyatoe-v1.4.0'; // поменяйте версию, если перерендерили музыку или заменили модели
+const CACHE = 'tridevyatoe-v1.4.1'; // поменяйте версию, если перерендерили музыку или заменили модели
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', 'index.html', 'style.css', 'vendor/three.module.js']).catch(() => {}))); });
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('tridevyatoe-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', (e) => {

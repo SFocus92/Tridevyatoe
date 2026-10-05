@@ -1033,9 +1033,22 @@ if (isTouch) {
     b.addEventListener('touchstart', (e) => { e.preventDefault(); if (!started) return; if (b.dataset.a === 'block') { mouseBlock = true; return; } if (b.dataset.a === 'jump') keys.add('Space'); if (b.dataset.a !== 'book' && b.dataset.a !== 'interact' && (ui.busy() || player.locked)) return; acts[b.dataset.a](); }, { passive: false });
     b.addEventListener('touchend', () => { if (b.dataset.a === 'block') mouseBlock = false; if (b.dataset.a === 'jump') keys.delete('Space'); });
   });
+  // v1.6.1: на телефоне камера по умолчанию дальше от героя; два пальца — приблизить/отдалить
+  camDist = 11; camPitch = 0.36;
+  const pts = new Map(); let pinch = 0;
+  const pd = () => { const a = [...pts.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
+  const ptsUp = (e) => { for (const t of e.changedTouches) pts.delete(t.identifier); pinch = pd(); };
+  canvas.addEventListener('touchstart', (e) => { for (const t of e.changedTouches) pts.set(t.identifier, { x: t.clientX, y: t.clientY }); pinch = pd(); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (pts.has(t.identifier)) pts.set(t.identifier, { x: t.clientX, y: t.clientY }); if (pts.size >= 2) { const d = pd(); if (pinch) camDist = Math.min(16, Math.max(4, camDist - (d - pinch) * 0.03)); pinch = d; } }, { passive: true });
+  canvas.addEventListener('touchend', ptsUp); canvas.addEventListener('touchcancel', ptsUp);
+  // v1.6.1: окно сказов и заданий сворачивается тапом (по умолчанию свёрнуто)
+  { const tr = document.getElementById('tracker'); const k = 'tdv_tracker_open';
+    const setT = (open) => { tr.classList.toggle('collapsed', !open); try { localStorage.setItem(k, open ? '1' : '0'); } catch (e) {} };
+    let open = false; try { open = localStorage.getItem(k) === '1'; } catch (e) {} setT(open);
+    tr.addEventListener('click', (e) => { e.preventDefault(); setT(tr.classList.contains('collapsed')); }); }
   let camT = null;
   canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; camT = { id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
-  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens * (OPT.invY ? -1 : 1))); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (pts.size >= 2) return; for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens * (OPT.invY ? -1 : 1))); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
 }
 
 // ---------- трекер ----------
