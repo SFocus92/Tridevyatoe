@@ -21,6 +21,7 @@ export class UI {
   constructor() {
     this.$ = (id) => document.getElementById(id);
     this.dialogOpen = false; this.bookOpen = false; this._cache = {};
+    this._cps = (() => { try { return Math.min(24, Math.max(8, +localStorage.getItem('tri_voice_cps') || 14)); } catch { return 14; } })(); // букв в секунду у голоса этого устройства
     this._resolve = null; this._choices = null; this._openedAt = 0; this._typing = null;
     window.addEventListener('keydown', (e) => this._key(e));
     this.$('dialog').addEventListener('click', (e) => { if (e.target.tagName !== 'BUTTON') this._advance(); });
@@ -64,8 +65,14 @@ export class UI {
     const nm = this.playerName ? this.playerName() : '';
     text = personal(touchText(text), nm); if (choices) choices = choices.map((c) => personal(touchText(c), nm));
     // озвучка: текст печатается в темпе голоса (начинает, когда голос зазвучал, и подтягивается по словам), а не убегает вперёд
-    const sync = { on: false, started: false, said: 0, end: false };
-    try { sync.on = !!(this.onSpeak && this.onSpeak(speaker, text, { start: () => (sync.started = true), word: (k) => { sync.got = true; sync.said = Math.max(sync.said, k); }, end: () => (sync.end = true) })); } catch {}
+    // v1.4.3: текст идёт ровно в темпе голоса — по часам (скорость голоса заучивается на устройстве) с подстройкой по словам, если движок их сообщает
+    const sync = { on: false, started: false, said: 0, end: false, tStart: 0, got: false };
+    const vrate = this.voiceRateFor ? this.voiceRateFor(speaker) : 1;
+    try { sync.on = !!(this.onSpeak && this.onSpeak(speaker, text, {
+      start: () => { sync.started = true; sync.tStart = sync.tVoice = performance.now(); },
+      word: (k, ci) => { sync.got = true; sync.said = Math.max(sync.said, k); if (ci != null && sync.started) { const el = (performance.now() - sync.tStart) / 1000, est = this._cps * vrate * el; if (Math.abs(est - ci) > 6) sync.tStart = performance.now() - (ci / (this._cps * vrate)) * 1000; } },
+      end: () => { sync.end = true; if (sync.tVoice) { const dur = (performance.now() - sync.tVoice) / 1000; if (dur > 1.5 && sync.map && sync.map.length > 25) { const m = sync.map.length / dur / vrate; this._cps = Math.min(24, Math.max(8, this._cps * 0.7 + m * 0.3)); try { localStorage.setItem('tri_voice_cps', this._cps.toFixed(2)); } catch {} } } } })); } catch {}
+    sync.map = this.speechMap ? this.speechMap(text) : null;
     const t0 = performance.now();
     this.$('dialog').classList.remove('hidden');
     this.$('dSpeaker').textContent = speaker;
@@ -82,17 +89,22 @@ export class UI {
       });
     };
     this._full = () => { clearInterval(this._typing); this._typing = null; t.textContent = text; if (!box.children.length) showChoices(); };
-    const cps = 14 * (this.voiceRate ? this.voiceRate() : 1); // ≈ букв в секунду у голоса
+    let last = performance.now();
     this._typing = setInterval(() => {
+      const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
       if (!sync.on) i += 2;
+      else if (sync.end) i = text.length;
       else {
-        if (sync.end) i = text.length;
-        else if (!sync.started && performance.now() - t0 < 900) return; // ждём, пока голос начнёт
-        else { const said = Math.round(sync.said * text.length / Math.max(1, sync.cleanLen || text.length)); if (said > i) i = said; else if (!sync.got || i < said + 28) i += cps * 0.016; }
+        if (!sync.started) { if (now - t0 < 1200) return; sync.started = true; sync.tStart = now; } // голос молчит — печатаем по часам
+        const map = sync.map, n = map ? map.length : text.length;
+        let k = this._cps * vrate * (now - sync.tStart) / 1000; // сколько букв уже сказано
+        if (sync.got) k = Math.min(k, sync.said + 4); // не убегать вперёд голоса
+        k = Math.min(n, Math.max(0, k));
+        const target = k >= n ? text.length : map ? map[Math.floor(k)] : Math.floor(k);
+        if (target > i) i += Math.max(dt * 4, (target - i) * Math.min(1, dt * 10));
       }
       t.textContent = text.slice(0, Math.floor(i)); if (i >= text.length) this._full();
     }, 16);
-    sync.cleanLen = this.cleanLen ? this.cleanLen(text) : text.length;
     return new Promise((res) => { this._resolve = res; });
   }
   _close(v) {

@@ -279,24 +279,35 @@ export function initEvening(c, X) {
   }
 
   // ---------- озвучка ----------
-  const VOICE = { 'Кот учёный': [0.75, 0.95], 'Русалка': [1.5, 1], 'Кикимора': [1.7, 1.12], 'Дед': [0.6, 0.9], 'Баба-Яга': [1.35, 0.92], 'Кощей': [0.3, 0.85], 'Кощей Бессмертный': [0.3, 0.85], 'Морозко': [0.45, 0.85], 'Снегурочка': [1.55, 1], 'Леший': [0.5, 0.95], 'Жар-птица': [1.8, 1.05], 'Щука': [0.9, 0.95], 'Колобок': [1.8, 1.25], 'Мышка-норушка': [2, 1.25], 'Алёнушка': [1.5, 1], 'Финист — Ясный Сокол': [0.9, 1], 'Василиса Премудрая': [1.25, 0.95], 'Иван': [1, 1.05] };
+  // v1.4.3: высота и темп голосов — умеренные (сильный сдвиг pitch/rate звучит «мультяшно» и ломает синхронизацию с текстом)
+  const VOICE = { 'Кот учёный': [0.85, 0.96], 'Русалка': [1.25, 0.98], 'Кикимора': [1.35, 1.04], 'Дед': [0.7, 0.92], 'Баба-Яга': [1.2, 0.94], 'Кощей': [0.55, 0.9], 'Кощей Бессмертный': [0.55, 0.9], 'Морозко': [0.6, 0.9], 'Снегурочка': [1.3, 0.98], 'Леший': [0.65, 0.95], 'Жар-птица': [1.4, 1], 'Щука': [0.9, 0.96], 'Колобок': [1.2, 1.04], 'Мышка-норушка': [1.45, 1.05], 'Алёнушка': [1.25, 0.98], 'Финист — Ясный Сокол': [0.9, 1], 'Василиса Премудрая': [1.15, 0.96], 'Иван': [1, 1] };
+  const vparams = (who) => { const v = VOICE[who] || [1, 1]; return [Math.min(1.5, Math.max(0.5, v[0])), Math.min(1.1, Math.max(0.88, v[1]))]; };
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null; let ruVoice = null;
   // предпочитаем голоса устройства (localService): они начинают говорить сразу, сетевые (Google) запаздывают на 0,5–2 с
   const pickVoice = () => { if (!synth) return; const vs = synth.getVoices().filter((v) => /^ru/i.test(v.lang)); ruVoice = vs.find((v) => v.localService && /milena|yandex|natural|irina|pavel|anna|katya/i.test(v.name)) || vs.find((v) => v.localService) || vs.find((v) => /google|natural/i.test(v.name)) || vs[0] || null; };
   if (synth) { pickVoice(); synth.onvoiceschanged = pickVoice; }
-  const clean = (text) => String(text).replace(/\([^)]*\)/g, ' ').replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ' ').replace(/[«»]/g, '').trim();
+  // текст для голоса + карта «буква голоса → буква на экране» (ремарки в скобках, эмодзи и «» не читаются)
+  const cleanMap = (text) => { const s = String(text); const out = [], map = []; let depth = 0;
+    for (let j = 0; j < s.length;) { const ch = String.fromCodePoint(s.codePointAt(j));
+      if (ch === '(') { depth++; out.push(' '); map.push(j); } else if (ch === ')' && depth) depth--; else if (depth) {} else if (/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(ch)) { out.push(' '); map.push(j); } else if (ch !== '«' && ch !== '»') { out.push(ch); map.push(j); }
+      j += ch.length; }
+    let a = 0, b = out.length; while (a < b && /\s/.test(out[a])) a++; while (b > a && /\s/.test(out[b - 1])) b--;
+    return { clean: out.slice(a, b).join(''), map: map.slice(a, b) }; };
+  const clean = (text) => cleanMap(text).clean;
   let keep = null, warmed = false, cur = null;
   const warm = () => { if (warmed || !synth || !ruVoice || !OPT.voice) return; warmed = true; try { const u = new SpeechSynthesisUtterance(' '); u.voice = ruVoice; u.volume = 0; synth.speak(u); } catch {} }; // «прогрев» движка речи по первому касанию
   addEventListener('pointerdown', warm, { once: false, passive: true }); addEventListener('keydown', warm, { passive: true });
   const hush = () => { cur = null; clearInterval(keep); keep = null; if (synth && (synth.speaking || synth.pending)) synth.cancel(); };
   ui.cleanLen = (text) => clean(text).length || 1;
   ui.voiceRate = () => OPT.voiceRate || 1;
+  ui.speechMap = (text) => cleanMap(text).map;
+  ui.voiceRateFor = (who) => vparams(who)[1] * (OPT.voiceRate || 1);
   ui.onSpeak = (who, text, hooks) => {
     hush(); if (!synth || !OPT.voice || !ruVoice) return false;
     const c = clean(text); if (!c) return false;
-    const u = new SpeechSynthesisUtterance(c); u.voice = ruVoice; u.lang = ruVoice.lang; const [pi, ra] = VOICE[who] || [1, 1]; u.pitch = pi; u.rate = ra * (OPT.voiceRate || 1); u.volume = Math.min(1, (OPT.master ?? 0.7) * 1.3);
+    const u = new SpeechSynthesisUtterance(c); u.voice = ruVoice; u.lang = ruVoice.lang; const [pi, ra] = vparams(who); u.pitch = pi; u.rate = ra * (OPT.voiceRate || 1); u.volume = Math.min(1, (OPT.master ?? 0.7) * 1.3);
     cur = u; const mine = (f) => (e) => { if (cur === u) f(e); };
-    u.onstart = mine(() => hooks?.start()); u.onboundary = mine((e) => hooks?.word(e.charIndex + (e.charLength || 0))); u.onend = u.onerror = mine(() => { hooks?.end(); clearInterval(keep); keep = null; });
+    u.onstart = mine(() => hooks?.start()); u.onboundary = mine((e) => { if (e.name && e.name !== 'word') return; hooks?.word(e.charIndex + (e.charLength || 0), e.charIndex); }); u.onend = u.onerror = mine(() => { hooks?.end(); clearInterval(keep); keep = null; });
     synth.speak(u); if (synth.paused) synth.resume();
     if (!ruVoice.localService) keep = setInterval(() => { if (synth.speaking && !synth.paused) { synth.pause(); synth.resume(); } }, 9000); // Chrome обрывает длинные фразы сетевых голосов
     return true;
