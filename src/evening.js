@@ -1,5 +1,6 @@
 // v1.1 «Вечера Лукоморья»: день и ночь, звёзды, светлячки, Жар-птица, «Сказка на ночь»,
 // пересказ сказов (крафт оберегов), доверие героев, озвучка диалогов голосом браузера.
+import { createVoice } from './voice.js';
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const CAT = 'Кот учёный';
@@ -297,13 +298,16 @@ export function initEvening(c, X) {
   let keep = null, warmed = false, cur = null;
   const warm = () => { if (warmed || !synth || !ruVoice || !OPT.voice) return; warmed = true; try { const u = new SpeechSynthesisUtterance(' '); u.voice = ruVoice; u.volume = 0; synth.speak(u); } catch {} }; // «прогрев» движка речи по первому касанию
   addEventListener('pointerdown', warm, { once: false, passive: true }); addEventListener('keydown', warm, { passive: true });
-  const hush = () => { cur = null; clearInterval(keep); keep = null; if (synth && (synth.speaking || synth.pending)) synth.cancel(); };
+  // v1.5: записанные голоса (assets/voice) — главные; speechSynthesis — запасной вариант
+  const REC = createVoice();
+  addEventListener('pointerdown', () => REC.unlock(), { passive: true }); addEventListener('keydown', () => REC.unlock(), { passive: true });
+  const hush = () => { cur = null; REC.stop(); clearInterval(keep); keep = null; if (synth && (synth.speaking || synth.pending)) synth.cancel(); };
   ui.cleanLen = (text) => clean(text).length || 1;
   ui.voiceRate = () => OPT.voiceRate || 1;
   ui.speechMap = (text) => cleanMap(text).map;
   ui.voiceRateFor = (who) => vparams(who)[1] * (OPT.voiceRate || 1);
-  ui.onSpeak = (who, text, hooks) => {
-    hush(); if (!synth || !OPT.voice || !ruVoice) return false;
+  const synthSpeak = (who, text, hooks) => {
+    if (!synth || !OPT.voice || !ruVoice) return false;
     const c = clean(text); if (!c) return false;
     const u = new SpeechSynthesisUtterance(c); u.voice = ruVoice; u.lang = ruVoice.lang; const [pi, ra] = vparams(who); u.pitch = pi; u.rate = ra * (OPT.voiceRate || 1); u.volume = Math.min(1, (OPT.master ?? 0.7) * 1.3);
     cur = u; const mine = (f) => (e) => { if (cur === u) f(e); };
@@ -312,9 +316,20 @@ export function initEvening(c, X) {
     if (!ruVoice.localService) keep = setInterval(() => { if (synth.speaking && !synth.paused) { synth.pause(); synth.resume(); } }, 9000); // Chrome обрывает длинные фразы сетевых голосов
     return true;
   };
+  ui.onSpeak = (who, text, hooks, raw) => {
+    hush(); if (!OPT.voice) return false;
+    let list = null; try { list = REC.find(who, raw ?? text, c.st?.name || '', document.body.classList.contains('touch')); } catch {}
+    if (list) {
+      const mine = {}; cur = mine;
+      REC.play(list, { rate: OPT.voiceRate || 1, volume: Math.min(1, (OPT.master ?? 0.7) * 1.3), chars: clean(text).length }, hooks, () => { if (cur === mine) synthSpeak(who, text, hooks); });
+      return true;
+    }
+    return synthSpeak(who, text, hooks);
+  };
   ui.onHush = () => hush();
+  ui.voiceFind = (who, raw) => REC.find(who, raw, c.st?.name || '', document.body.classList.contains('touch')); // для тестов: есть ли запись
   ui.voiceOff = () => hush();
-  const hasVoice = () => !!ruVoice;
+  const hasVoice = () => !!ruVoice || REC.has();
 
   // ---------- обереги и доверие ----------
   function applyCharms() { const s = c.st; ensure(s); player.sightCost = s.charms.includes('kiki') ? 0.5 : 1; player.dmgK = s.charms.includes('cat') ? 1.33 : 1; }

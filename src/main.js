@@ -1389,4 +1389,21 @@ camera.position.set(20, 12, 20); camera.lookAt(0, 4, 0);
 applyLife(life); lifeShown = life;
 window.__game = { THREE, scene, camera, renderer, st: () => st, player, startGame, ui, enemies, attack, toggleSight, kolobok, setLife: (v) => (lifeOverride = v), travel, setRegion, REGIONS, switchHero, unlockHero, interact, nearest, hurtEnemy, objective, jump, ability, heroes, hittables, interactables, save, keys, groundH, region: () => region, ctx, S, EV: () => EV, cam: { get yaw() { return camYaw; }, set yaw(v) { camYaw = v; } } };
 if ("serviceWorker" in navigator && location.protocol === "https:") setTimeout(() => navigator.serviceWorker.register("sw.js").catch(() => {}), 3000); // кэш музыки и моделей (только на https, напр. GitHub Pages)
+// v1.5: офлайн — service worker докачивает всю игру и всю озвучку (≈40 МБ, один раз); прогресс — в настройках
+try { if ("serviceWorker" in navigator && location.protocol === "https:") {
+  const el = document.getElementById('offlineState'); const OFF_KEY = 'tri_offline_ok';
+  const show = (t) => { if (el) el.textContent = t; };
+  show(localStorage.getItem(OFF_KEY) ? '📦 Игра и озвучка сохранены — можно играть без интернета.' : '📦 Готовим игру и озвучку для игры без интернета…');
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    const d = e.data || {}; if (d.type !== 'offline' || !d.total) return;
+    const pc = Math.floor((d.done / d.total) * 100);
+    if (!d.finished) { show(`📦 Сохраняем игру и озвучку для игры без интернета: ${pc}%`); return; }
+    if (!d.failed) { show('📦 Игра и озвучка сохранены — можно играть без интернета.'); if (!localStorage.getItem(OFF_KEY)) { localStorage.setItem(OFF_KEY, '1'); try { ui.toast('Игра и озвучка сохранены — теперь можно играть без интернета', false, 4200); } catch {} } }
+    else show(`📦 Сохранено ${d.done - d.failed} из ${d.total} файлов — остальное докачается при следующем запуске с интернетом.`);
+  });
+  const go = () => navigator.serviceWorker.ready.then((reg) => { const w = reg.active || navigator.serviceWorker.controller; w && w.postMessage({ type: 'offline' }); }).catch(() => {});
+  const lite = navigator.connection && navigator.connection.saveData;
+  if (!lite && navigator.onLine !== false) setTimeout(go, 9000);
+  addEventListener('online', () => setTimeout(go, 3000));
+} } catch {}
 loop();

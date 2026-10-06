@@ -63,6 +63,7 @@ export class UI {
   dialog(speaker, text, choices = null) {
     this.dialogOpen = true; this._openedAt = performance.now(); document.body.classList.add('dlg');
     const nm = this.playerName ? this.playerName() : '';
+    const raw = text; // v1.5: исходный текст — ключ записанной озвучки
     text = personal(touchText(text), nm); if (choices) choices = choices.map((c) => personal(touchText(c), nm));
     // озвучка: текст печатается в темпе голоса (начинает, когда голос зазвучал, и подтягивается по словам), а не убегает вперёд
     // v1.4.3: текст идёт ровно в темпе голоса — по часам (скорость голоса заучивается на устройстве) с подстройкой по словам, если движок их сообщает
@@ -71,7 +72,7 @@ export class UI {
     try { sync.on = !!(this.onSpeak && this.onSpeak(speaker, text, {
       start: () => { sync.started = true; sync.tStart = sync.tVoice = performance.now(); },
       word: (k, ci) => { sync.got = true; sync.said = Math.max(sync.said, k); if (ci != null && sync.started) { const el = (performance.now() - sync.tStart) / 1000, est = this._cps * vrate * el; if (Math.abs(est - ci) > 6) sync.tStart = performance.now() - (ci / (this._cps * vrate)) * 1000; } },
-      end: () => { sync.end = true; if (sync.tVoice) { const dur = (performance.now() - sync.tVoice) / 1000; if (dur > 1.5 && sync.map && sync.map.length > 25) { const m = sync.map.length / dur / vrate; this._cps = Math.min(24, Math.max(8, this._cps * 0.7 + m * 0.3)); try { localStorage.setItem('tri_voice_cps', this._cps.toFixed(2)); } catch {} } } } })); } catch {}
+      end: (rec) => { sync.end = true; if (!rec && sync.tVoice) { const dur = (performance.now() - sync.tVoice) / 1000; if (dur > 1.5 && sync.map && sync.map.length > 25) { const m = sync.map.length / dur / vrate; this._cps = Math.min(24, Math.max(8, this._cps * 0.7 + m * 0.3)); try { localStorage.setItem('tri_voice_cps', this._cps.toFixed(2)); } catch {} } } } }, raw)); } catch {}
     sync.map = this.speechMap ? this.speechMap(text) : null;
     const t0 = performance.now();
     this.$('dialog').classList.remove('hidden');
