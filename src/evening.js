@@ -401,7 +401,7 @@ export function initEvening(c, X) {
     const s = ensure(c.st);
     if (!tale) { const done = NIGHT_TALES.filter((t) => s.nightTales.includes(t.title)); const k = await ui.dialog(CAT, 'Какую рассказать снова?', [...done.map((t) => t.title), 'Никакую — спать']); if (k < 0 || k >= done.length) { await sleepTo(0.24); return; } tale = done[k]; }
     telling = true; if (stage) { lukGroup.remove(stage); stage = null; }
-    c.setCam({ pos: camFor(), look: STAGE.clone().add(new THREE.Vector3(0, 0.8, 0)) });
+    c.setCam({ pos: camFor(), look: camLook() });
     try {
       await ui.say(CAT, [`Мур-р… Слушай сказку на ночь — «${tale.title}». А ты подсказывай, что было дальше.`]);
       for (const st of tale.steps) {
@@ -419,7 +419,10 @@ export function initEvening(c, X) {
     const k = await ui.dialog(CAT, 'А теперь — спать. Утро вечера мудренее.', ['Спокойной ночи, Кот! ☀', 'Ещё посижу']);
     if (k === 0) await sleepTo(0.24, 'Доброе утро! Сказка приснилась ещё раз.');
   }
-  function camFor() { const d = new THREE.Vector3(X.FIRE3.x - STAGE.x, 0, X.FIRE3.z - STAGE.z).normalize(); return STAGE.clone().addScaledVector(d, 5.5).add(new THREE.Vector3(0, 2.6, 0)); }
+  // v1.5.4: камера дальше и выше — помещается вся сцена, а сама сцена — над окном диалога (точка взгляда чуть ниже и ближе)
+  const camDir = () => new THREE.Vector3(X.FIRE3.x - STAGE.x, 0, X.FIRE3.z - STAGE.z).normalize();
+  function camFor() { return STAGE.clone().addScaledVector(camDir(), 8.2).add(new THREE.Vector3(0, 3.6, 0)); }
+  function camLook() { return STAGE.clone().addScaledVector(camDir(), 1.2).add(new THREE.Vector3(0, -0.5, 0)); }
 
   // ---------- кадр ----------
   function tintSky(top, bot, inLuk) { if (!inLuk || night + Math.max(0, 1 - Math.abs(elev + 0.15) / 0.35) < 0.001) return; const dusk = Math.max(0, 1 - Math.abs(elev + 0.15) / 0.35) * (1 - night * 0.6); top.lerp(NT, night * 0.92); bot.lerp(NB, night * 0.88); bot.lerp(DUSK, dusk * 0.4); }

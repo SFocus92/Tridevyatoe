@@ -52,6 +52,7 @@ export default function bridge(ctx) {
   for (let i = 0; i < 6; i++) kit('town/fence', VIL.x - 6 + i * 3, VIL.z + 6, 3, Math.PI / 2, 0, group, H);
   kit('town/cart', VIL.x + 7, VIL.z + 2, 2.8, 0.4, 0, group, H); colliders.push({ x: VIL.x + 7, z: VIL.z + 2, r: 1.6 });
   const stone = ctx.P('stone_tallA', STONE.x, STONE.z, 4, 0.3, 0, group, H); colliders.push({ x: STONE.x, z: STONE.z, r: 1 });
+  try { ctx.runeStone?.(stone, ['КАЛИНОВ МОСТ', 'РЕКА СМОРОДИНА', '', 'СТРАЖ МОСТА —', 'ГОРЫНЫЧ,', 'СЫН ГОРЫ'], { faces: [Math.atan2(SPAWN.x - STONE.x, SPAWN.z - STONE.z), Math.atan2(GOR.x - STONE.x, GOR.z - STONE.z)], unread: () => !ctx.st.bridge?.readStone }); } catch (e) { console.error('rune', e); }
   homePortal(ctx, group, SPAWN.x + 8, SPAWN.z + 1, H, -0.3); const HOME = V(SPAWN.x + 8, SPAWN.z + 1);
   const fire = campfire(ctx, group, FIRE.x, FIRE.z, H);
   const feastFire = campfire(ctx, group, FEAST.x, FEAST.z, H);

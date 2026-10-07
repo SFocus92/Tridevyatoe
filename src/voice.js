@@ -50,7 +50,7 @@ export function createVoice() {
     stop();
     const me = (cur = { tick: 0 }); const total = list.reduce((a, x) => a + x.w, 0) || 1; const scale = (chars || total) / total;
     let i = 0, before = 0, started = false, live = false; // live — текущий кусочек уже звучит (до этого el ещё держит старый файл)
-    const report = () => { if (cur !== me) return; const d = el.duration; const p = live && d && isFinite(d) ? Math.min(1, el.currentTime / d) : 0; const k = Math.round((before + p * list[i].w) * scale); hooks.word && hooks.word(k, k); };
+    const report = () => { if (cur !== me || !list[i]) return; const d = el.duration; const p = live && d && isFinite(d) ? Math.min(1, el.currentTime / d) : 0; const k = Math.round((before + p * list[i].w) * scale); hooks.word && hooks.word(k, k); };
     const bad = () => { if (cur !== me) return; stop(); if (!started) fail(); else hooks.end && hooks.end(true); };
     const next = () => {
       if (cur !== me) return;

@@ -387,6 +387,10 @@ const linkCount = () => Object.values(st.links).filter(Boolean).length;
 
 const player = { pos: new THREE.Vector3(10, 0, 13), vy: 0, facing: Math.PI, onGround: true, hp: 5, maxHp: 5, word: 100, attackT: 0, hurtT: 0, buffT: 0, speedT: 0, luckCd: 0, walk: 0, sight: false, locked: false, hero: 'ivan', jumps: 0, dashT: 0, hidden: 0, hiddenModel: false, slow: 0, stepPh: 0, sightCost: 1, cold: 0 };
 let camYaw = 0.6, camPitch = 0.3, camDist = 8, sens = 1;
+// v1.5.4: камеру можно крутить и в диалогах (перетаскиванием), смотреть вверх; во время «сказки на ночь» — облёт вокруг сцены
+const PITCH_MIN = -0.45, PITCH_MAX = 1.25; let ovYaw = 0, ovPitch = 0, ovZoom = 1, drag = null;
+function rotCam(dx, dy) { if (camOverride) { ovYaw -= dx; ovPitch = Math.min(0.9, Math.max(-0.5, ovPitch + dy)); } else { camYaw -= dx; camPitch = Math.min(PITCH_MAX, Math.max(PITCH_MIN, camPitch + dy)); } }
+function zoomCam(d) { if (camOverride) ovZoom = Math.min(1.8, Math.max(0.55, ovZoom + d * 0.08)); else camDist = Math.min(16, Math.max(4, camDist + d)); }
 
 // враги
 const enemies = [];
@@ -438,16 +442,17 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => keys.delete(e.code));
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
+  if (started && document.pointerLockElement !== canvas && (ui.dialogOpen || camOverride)) { drag = { x: e.clientX, y: e.clientY }; return; }
   if (!started || ui.busy() || player.locked) return;
   if (document.pointerLockElement !== canvas) { canvas.requestPointerLock?.(); return; }
   if (e.button === 0) attack(); if (e.button === 2) mouseBlock = true;
 });
-addEventListener('mouseup', (e) => { if (e.button === 2) mouseBlock = false; });
+addEventListener('mouseup', (e) => { drag = null; if (e.button === 2) mouseBlock = false; });
 addEventListener('mousemove', (e) => {
-  if (document.pointerLockElement !== canvas) return;
-  camYaw -= e.movementX * 0.0028 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + e.movementY * 0.0022 * sens * (OPT.invY ? -1 : 1)));
+  if (document.pointerLockElement !== canvas) { if (drag && e.buttons) rotCam(e.movementX * 0.005 * sens, e.movementY * 0.004 * sens * (OPT.invY ? -1 : 1)); else drag = null; return; }
+  rotCam(e.movementX * 0.0028 * sens, e.movementY * 0.0022 * sens * (OPT.invY ? -1 : 1));
 });
-addEventListener('wheel', (e) => { camDist = Math.min(16, Math.max(4, camDist + e.deltaY * 0.01)); });
+addEventListener('wheel', (e) => zoomCam(e.deltaY * 0.01));
 
 // ---------- механики ----------
 function toggleSight(force) {
@@ -804,6 +809,34 @@ function addBook(title, text) {
   if (st.book.length === 5) setTimeout(() => ui.toast('Все сказы Лукоморья собраны! Кот учёный хочет тебе кое-что сказать.', true, 4500), 2500);
 }
 function addWord(word, text) { if (st.words.some((w) => w.word === word)) return; st.words.push({ word, text }); save(); S.chime(); ui.toast(`Найдено забытое слово ${st.words.length}/${WORDS_TOTAL}: «${word}»`, true); }
+// v1.5.4: камень с надписью — высеченные золотые буквы (видно издалека, что на камне что-то написано) и парящий ромб, пока не прочитан
+const RUNES = [];
+function runeStone(stone, lines, { faces = [0], unread = () => false, size = 1 } = {}) {
+  const par = stone.parent; par.updateMatrixWorld(true); stone.updateMatrixWorld(true);
+  const bb = new THREE.Box3().setFromObject(stone), sz = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 640; const x = cv.getContext('2d'), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const draw = () => { x.clearRect(0, 0, 512, 640); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = 'rgba(28,20,12,.55)'; x.fillRect(22, 22, 468, 596);
+    x.strokeStyle = 'rgba(255,215,106,.85)'; x.lineWidth = 6; x.shadowColor = '#ffb030'; x.shadowBlur = 18; x.strokeRect(22, 22, 468, 596);
+    x.lineWidth = 3; x.strokeRect(38, 38, 436, 564); x.fillStyle = '#ffd76a'; for (const [cx, cy] of [[38, 38], [474, 38], [38, 602], [474, 602]]) { x.beginPath(); x.moveTo(cx, cy - 14); x.lineTo(cx + 14, cy); x.lineTo(cx, cy + 14); x.lineTo(cx - 14, cy); x.fill(); }
+    const fs = Math.min(62, Math.floor(500 / Math.max(...lines.map((l) => l.length)) * 1.6)), lh = Math.min(fs * 1.25, 520 / lines.length);
+    x.font = `${fs}px 'Ruslan Display', Kurale, Georgia, serif`; const y0 = 320 - ((lines.length - 1) * lh) / 2;
+    lines.forEach((l, i) => { x.shadowBlur = 0; x.fillStyle = 'rgba(30,18,6,.85)'; x.fillText(l, 258, y0 + i * lh + 4); x.shadowBlur = 16; x.shadowColor = '#ffa020'; x.fillStyle = '#ffe08a'; x.fillText(l, 256, y0 + i * lh); });
+    tex.needsUpdate = true; };
+  draw(); document.fonts?.load("48px 'Ruslan Display'").then(draw).catch(() => {});
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const pw = Math.min(1.7, Math.max(0.8, 0.8 * Math.min(sz.x, sz.z))) * size, ph = pw * 1.25, hy = bb.min.y + sz.y * 0.42, rc = new THREE.Raycaster();
+  for (const a of faces) { const d = new THREE.Vector3(Math.sin(a), 0, Math.cos(a)); rc.set(new THREE.Vector3(ctr.x, hy, ctr.z).addScaledVector(d, 12), d.clone().negate()); const h = rc.intersectObject(stone, true)[0];
+    const wp = h ? h.point.clone().addScaledVector(d, 0.05) : new THREE.Vector3(ctr.x, hy, ctr.z).addScaledVector(d, Math.max(sz.x, sz.z) / 2 + 0.05);
+    const pl = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat); pl.position.copy(par.worldToLocal(wp)); pl.rotation.y = a; pl.renderOrder = 2; par.add(pl); }
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.28), new THREE.MeshBasicMaterial({ color: 0xffd76a })); gem.scale.y = 1.5; const gp = par.worldToLocal(new THREE.Vector3(ctr.x, bb.max.y + 0.9, ctr.z)); gem.position.copy(gp); par.add(gem);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color: 0xffc040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.7 })); halo.scale.setScalar(1.6); gem.add(halo);
+  const wpos = new THREE.Vector3(ctr.x, bb.min.y, ctr.z);
+  RUNES.push((dt, t) => { const un = unread(), dd = Math.hypot(player.pos.x - wpos.x, player.pos.z - wpos.z); gem.visible = un; if (un) { gem.rotation.y += dt * 1.6; gem.position.y = gp.y + Math.sin(t * 2.2) * 0.15; }
+    mat.opacity = (dd < 9 ? 1 : 0.8) * (un ? 0.78 + Math.sin(t * 3) * 0.22 : 0.85); });
+  return { mat, gem };
+}
+let _glow = null; function glowTex() { if (_glow) return _glow; const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); _glow = new THREE.CanvasTexture(c); return _glow; }
+runeStone(stone, ['НАПРАВО ПОЙДЁШЬ —', 'К БОЛОТУ ПРИДЁШЬ', '', 'НАЛЕВО ПОЙДЁШЬ —', 'В РОЩУ ПРИДЁШЬ', '', 'ПРЯМО ПОЙДЁШЬ —', 'К ДУБУ ВЫЙДЕШЬ'], { faces: [Math.atan2(-STONE.x, -STONE.y), Math.atan2(-STONE.x, -STONE.y) + Math.PI], unread: () => (st.stoneReads || 0) < 3 });
 async function stoneTalk() {
   st.stoneReads++; save();
   if (st.stoneReads < 3) {
@@ -1073,7 +1106,7 @@ if (isTouch) {
   const pd = () => { const a = [...pts.values()]; return a.length < 2 ? 0 : Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); };
   const ptsUp = (e) => { for (const t of e.changedTouches) pts.delete(t.identifier); pinch = pd(); };
   canvas.addEventListener('touchstart', (e) => { for (const t of e.changedTouches) pts.set(t.identifier, { x: t.clientX, y: t.clientY }); pinch = pd(); }, { passive: true });
-  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (pts.has(t.identifier)) pts.set(t.identifier, { x: t.clientX, y: t.clientY }); if (pts.size >= 2) { const d = pd(); if (pinch) camDist = Math.min(16, Math.max(4, camDist - (d - pinch) * 0.03)); pinch = d; } }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (pts.has(t.identifier)) pts.set(t.identifier, { x: t.clientX, y: t.clientY }); if (pts.size >= 2) { const d = pd(); if (pinch) zoomCam(-(d - pinch) * 0.03); pinch = d; } }, { passive: true });
   canvas.addEventListener('touchend', ptsUp); canvas.addEventListener('touchcancel', ptsUp);
   // v1.6.1: окно сказов и заданий сворачивается тапом (по умолчанию свёрнуто)
   { const tr = document.getElementById('tracker'); const k = 'tdv_tracker_open';
@@ -1082,7 +1115,7 @@ if (isTouch) {
     tr.addEventListener('click', (e) => { e.preventDefault(); setT(tr.classList.contains('collapsed')); }); }
   let camT = null;
   canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; camT = { id: t.identifier, x: t.clientX, y: t.clientY }; }, { passive: true });
-  canvas.addEventListener('touchmove', (e) => { if (pts.size >= 2) return; for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { camYaw -= (t.clientX - camT.x) * 0.006 * sens; camPitch = Math.min(1.25, Math.max(0.05, camPitch + (t.clientY - camT.y) * 0.004 * sens * (OPT.invY ? -1 : 1))); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (pts.size >= 2) return; for (const t of e.changedTouches) if (camT && t.identifier === camT.id) { rotCam((t.clientX - camT.x) * 0.006 * sens, (t.clientY - camT.y) * 0.004 * sens * (OPT.invY ? -1 : 1)); camT.x = t.clientX; camT.y = t.clientY; } }, { passive: true });
 }
 
 // ---------- трекер ----------
@@ -1128,7 +1161,7 @@ function update(dt) {
   const blocking = (keys.has('KeyK') || mouseBlock) && canMove;
   let moving = false, speed = 0;
   if (canMove) {
-    if (keys.has('ArrowLeft')) camYaw += dt * 2; if (keys.has('ArrowRight')) camYaw -= dt * 2;
+    if (keys.has('ArrowLeft')) rotCam(-dt * 2, 0); if (keys.has('ArrowRight')) rotCam(dt * 2, 0);
     let ix = 0, iz = 0;
     if (keys.has('KeyW') || keys.has('ArrowUp')) iz -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) iz += 1; if (keys.has('KeyA')) ix -= 1; if (keys.has('KeyD')) ix += 1;
     if (joy.id !== null) { ix += joy.x; iz += joy.y; }
@@ -1250,8 +1283,10 @@ function update(dt) {
   if (TL) { try { TL.update(dt, canMove, inLuk); } catch (e) { console.error('tales', e); } }
 
   EV && EV.update(dt, inLuk);
+  { const tt = performance.now() / 1000; for (const f of RUNES) f(dt, tt); }
   // камера
   const tgt = p.pos.clone().add(new THREE.Vector3(0, 1.7, 0));
+  if (camPitch < 0.1 && !camOverride) tgt.y += (0.1 - camPitch) * 4; // взгляд вверх: камера опускается к земле и смотрит в небо
   const cp = new THREE.Vector3(Math.sin(camYaw) * Math.cos(camPitch) * camDist, Math.sin(camPitch) * camDist, Math.cos(camYaw) * Math.cos(camPitch) * camDist).add(tgt);
   { // «пружинная» камера: не прячемся за деревьями
     const dir = cp.clone().sub(tgt); const len = dir.length(); dir.normalize();
@@ -1261,7 +1296,9 @@ function update(dt) {
     if (hit) cp.copy(tgt).addScaledVector(dir, Math.max(1.6, hit.distance - 0.4));
   }
   cp.y = Math.max(cp.y, groundH(cp.x, cp.z) + 0.6, 0.6);
-  if (camOverride) cp.copy(camOverride.pos);
+  if (camOverride) { const v = camOverride.pos.clone().sub(camOverride.look), r = v.length() * ovZoom, y0 = Math.atan2(v.x, v.z) + ovYaw, p0 = Math.min(1.3, Math.max(-0.1, Math.asin(v.y / v.length()) + ovPitch));
+    cp.set(Math.sin(y0) * Math.cos(p0) * r, Math.sin(p0) * r, Math.cos(y0) * Math.cos(p0) * r).add(camOverride.look); cp.y = Math.max(cp.y, groundH(cp.x, cp.z) + 0.6); }
+  cp.y = Math.min(cp.y, OAK.y + 13); // не выше кроны дуба
   camera.position.lerp(cp, Math.min(1, dt * (camOverride ? 2.5 : 10))); camera.lookAt(camOverride ? camOverride.look : tgt);
   if (shakeT > 0 && OPT.shake) { shakeT -= dt; camera.position.x += (Math.random() - 0.5) * shakeT; camera.position.y += (Math.random() - 0.5) * shakeT; }
   sun.position.copy(p.pos).add(new THREE.Vector3(25, 45, 18)); sun.target.position.copy(p.pos);
@@ -1375,7 +1412,7 @@ const ctx = {
   burst, makeChar, wait, srand, smooth, mixers, chars, colliders, camBlockers, interactables, enemies, hittables, player, heroes, keys, camera,
   get st() { return st; }, save, addBook, addWord, travel, groundH, unlockHero, switchHero, hurtPlayer, hurtEnemy, toggleSight, shake, makeForgetling,
   T: () => T, life: () => life, lifeify, lifeifyTree, uLife, objective: () => objective(), makeTerrain, spawnEnemy, removeEnemies, lockPlayer: (v) => (player.locked = v),
-  setLifeOverride: (v) => (lifeOverride = v), setCam: (v) => (camOverride = v), setFestival: (f) => (festivalUpd = f), outline, HERO_NAME, PORTAL3, LUK_PORTAL_POS: () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4),
+  setLifeOverride: (v) => (lifeOverride = v), runeStone, setCam: (v) => { camOverride = v; ovYaw = 0; ovPitch = 0; ovZoom = 1; }, setFestival: (f) => (festivalUpd = f), outline, HERO_NAME, PORTAL3, LUK_PORTAL_POS: () => new THREE.Vector3(PORTAL.x + 3, 0, PORTAL.y + 4),
   region: () => region, REGIONS, fade: (v) => (document.getElementById('fade').style.opacity = v), mouseBlock: () => mouseBlock || keys.has('KeyK'), V2, SKY, cat, catPet, OAK,
   makeMermaid, makePike, lukH: H, MERMAID_GROUND, KIKI_POS, STONE3, FIRE3, PIKE3, mermaid, kiki, burstAt: burst, HERO_KEYS, nightTales: () => (st.nightTales || []), night: () => (EV ? EV.night() : 0), ringFx, teleport: () => teleport(), EV: () => EV, XT: () => XT, TL: () => TL, hurtPlayerRaw: hurtPlayer,
 };
