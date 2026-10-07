@@ -118,9 +118,7 @@ export function initExtra(c) {
   const WIN = terem.localToWorld(new THREE.Vector3(0, 9, 2.4)); terem.updateMatrixWorld(true); WIN.copy(terem.localToWorld(new THREE.Vector3(0, 9, 2.4)));
   const DOOR = terem.localToWorld(new THREE.Vector3(0, 0, 4)); DOOR.y = H(DOOR.x, DOOR.z);
   const elena = c.npc('elena'); elena.root.position.copy(terem.localToWorld(new THREE.Vector3(0, 8.45, 1.2))); elena.root.rotation.y = terem.rotation.y; g.add(elena.root);
-  const hp = c.pet('pets/deer', 1.55); const HR = tint(hp.root, 0x8a6a4a); g.add(HR); HR.position.copy(HORSE_HOME); HR.visible = false;
-  // грива и хвост — чтобы олень стал конём
-  { const mane = T3(0x3a2614); const m1 = M(new THREE.BoxGeometry(0.12, 0.35, 0.9), mane, 0, 1.55, 0.35, HR); m1.rotation.x = -0.5; const tl = M(new THREE.ConeGeometry(0.12, 0.8, 6), mane, 0, 1.0, -0.75, HR); tl.rotation.x = -2.4; HR.traverse((o) => { if (/antler|horn/i.test(o.name)) o.visible = false; }); }
+  const hp = c.horse(1.55); const HR = hp.root; g.add(HR); HR.position.copy(HORSE_HOME); HR.visible = false;
   const SB = 'Сивка-Бурка', EL = 'Царевна Елена';
   function mount() { if (player.ride === 'wolf') c.TL?.()?.dismount(); player.ride = true; X().horseAt = null; S.stomp(); ui.toast('🐎 Ты на Сивке-Бурке! Скорость ×1.75, Пробел — богатырский прыжок. F (вдали от всех) — спешиться', false, 4000); }
   function dismount(silent) { if (player.ride !== true) return; player.ride = false; const e = X(); const p = player.pos; e.horseAt = [p.x + Math.sin(player.facing + 1.6) * 1.6, p.z + Math.cos(player.facing + 1.6) * 1.6]; if (!inLuk()) e.horseAt = [HORSE_HOME.x, HORSE_HOME.z]; if (!silent) { c.save(); S.jump(); } }

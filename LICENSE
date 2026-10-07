@@ -1,0 +1,49 @@
+Тридевятое: Сказитель
+Copyright (c) 2026 SFocus92. Все права защищены. / All rights reserved.
+
+Русский
+
+1. Исходный код игры (каталоги src/, tools/, файлы index.html, preview.html,
+   style.css, sw.js и др.), а также собственный контент автора — тексты сказов
+   и реплик, сценарии, игровые механики в их конкретном воплощении, изображения
+   заставки (assets/ui/), музыка и модели, созданные автором, — являются
+   объектами авторского права SFocus92.
+
+2. Разрешается бесплатно играть в игру на официальных страницах
+   (https://sfocus92.github.io/Tridevyatoe/ и других адресах, опубликованных
+   автором), просматривать исходный код в репозитории в ознакомительных целях,
+   делиться ссылкой на игру, снимать и публиковать видео и скриншоты игрового
+   процесса.
+
+3. Без предварительного письменного разрешения автора запрещается:
+   копировать, изменять, распространять, публиковать на других сайтах
+   (в том числе в виде зеркал и форков с запуском игры), продавать,
+   сублицензировать исходный код или контент полностью либо частично,
+   а также использовать их для создания производных игр и продуктов.
+
+4. Сторонние компоненты распространяются на условиях своих лицензий,
+   которые имеют приоритет для соответствующих файлов (подробности —
+   в файле CREDITS.md):
+   - модели Kenney (assets/kits/ и др.) — CC0 1.0;
+   - библиотека three.js (vendor/) — MIT, © three.js authors;
+   - шрифты Ruslan Display и Kurale (assets/fonts/) — SIL Open Font License 1.1;
+   - озвучка (assets/voice/) синтезирована моделью Silero TTS v5_5_ru —
+     CC BY-NC 4.0, © Silero Team; ударения — Silero Stress (MIT).
+   Русские народные сказки как фольклорные сюжеты являются общественным
+   достоянием; охраняется авторская переработка и обработка текстов.
+
+5. ПРОГРАММА ПРЕДОСТАВЛЯЕТСЯ «КАК ЕСТЬ», БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ.
+
+По вопросам разрешений и сотрудничества: GitHub https://github.com/SFocus92,
+Telegram @S_focus (https://t.me/S_focus).
+
+English (summary)
+
+Copyright (c) 2026 SFocus92. All rights reserved. You may play the game at its
+official pages, read the source code for reference, share links, and publish
+gameplay videos and screenshots. Copying, modifying, redistributing, hosting,
+selling or creating derivative works from the code or the author's content
+requires prior written permission. Third-party components are licensed under
+their own terms listed in CREDITS.md (Kenney CC0, three.js MIT, fonts OFL 1.1,
+Silero TTS voice output CC BY-NC 4.0, Silero Stress MIT). The software is
+provided "as is", without warranty of any kind.

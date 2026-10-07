@@ -124,6 +124,32 @@ function pet(path, s = 1) {
   let cur = null; const play = (n) => { const a = actions[n]; if (!a || a === cur) return; a.reset().play(); if (cur) cur.crossFadeTo(a, 0.25, false); cur = a; };
   play('idle'); mixers.push(mixer); return { root, mixer, actions, play };
 }
+// конь в стиле Blocky: тело, шея, голова с мордой, уши, грива, чёлка, хвост, копыта; свой шаг/покой (вместо оленя из Cube Pets)
+function horse(s = 1.55, col = 0x9a6a3e, maneCol = 0x3a2614) {
+  const root = new THREE.Group(), m = new THREE.Group(); m.scale.setScalar(s / 1.55 * 1.25); root.add(m);
+  const coat = toon(col), dark = toon(new THREE.Color(col).multiplyScalar(0.62).getHex()), mane = toon(maneCol), hoof = toon(0x2a1a10), eye = toon(0x111111), white = toon(0xf4ead8);
+  const box = (w, h, d, mat, x, y, z, par) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); o.position.set(x, y, z); o.castShadow = true; par.add(o); return o; };
+  const body = new THREE.Group(); m.add(body);
+  box(0.5, 0.42, 1.15, coat, 0, 0.82, 0, body); box(0.52, 0.12, 0.3, toon(0x8a2a1e), 0, 1.05, 0.05, body); // чепрак под седока
+  const legs = [];
+  for (const [x, z] of [[0.16, 0.42], [-0.16, 0.42], [0.16, -0.42], [-0.16, -0.42]]) { const lg = new THREE.Group(); lg.position.set(x, 0.66, z); m.add(lg); box(0.16, 0.56, 0.16, coat, 0, -0.28, 0, lg); box(0.18, 0.12, 0.19, hoof, 0, -0.6, 0.01, lg); legs.push(lg); }
+  const neck = new THREE.Group(); neck.position.set(0, 0.92, 0.5); neck.rotation.x = 0.55; body.add(neck);
+  box(0.3, 0.66, 0.32, coat, 0, 0.3, 0, neck); box(0.09, 0.7, 0.12, mane, 0, 0.33, -0.19, neck);
+  const head = new THREE.Group(); head.position.set(0, 0.62, 0.02); head.rotation.x = 0.35; neck.add(head);
+  box(0.28, 0.3, 0.3, coat, 0, 0, 0, head); box(0.24, 0.24, 0.28, dark, 0, -0.02, 0.27, head); box(0.06, 0.12, 0.02, white, 0, 0.05, 0.155, head);
+  for (const sx of [-1, 1]) { box(0.02, 0.06, 0.06, eye, sx * 0.145, 0.05, 0.02, head); const ear = box(0.07, 0.16, 0.06, coat, sx * 0.09, 0.2, -0.08, head); ear.rotation.z = -sx * 0.18; }
+  box(0.14, 0.1, 0.1, mane, 0, 0.17, 0.08, head);
+  const tail = new THREE.Group(); tail.position.set(0, 0.98, -0.58); tail.rotation.x = 0.45; body.add(tail); box(0.13, 0.62, 0.13, mane, 0, -0.28, -0.02, tail);
+  let mode = 'idle', t = 0; const walk = { timeScale: 1 }, idle = { timeScale: 1 };
+  const mixer = { getRoot: () => m, update(dt) {
+    t += dt; const w = mode === 'walk' ? 1 : 0, ph = t * 7.5 * walk.timeScale, sw = Math.sin(ph) * 0.55 * w;
+    legs[0].rotation.x = sw; legs[3].rotation.x = sw; legs[1].rotation.x = -sw; legs[2].rotation.x = -sw;
+    body.position.y = w ? Math.abs(Math.sin(ph)) * 0.05 : Math.sin(t * 1.6) * 0.008;
+    neck.rotation.x = 0.55 + (w ? Math.sin(ph * 2) * 0.06 : Math.sin(t * 0.9) * 0.05); head.rotation.x = 0.35 + (w ? 0 : Math.max(0, Math.sin(t * 0.37)) * 0.25);
+    tail.rotation.z = Math.sin(t * (w ? 6 : 1.8)) * (w ? 0.18 : 0.12); } };
+  mixers.push(mixer);
+  return { root, mixer, actions: { walk, idle }, play: (n) => { mode = n === 'walk' || n === 'run' ? 'walk' : 'idle'; } };
+}
 function npc(kind, opts) { const c = makeChar(kind, opts); chars.push(c); return c; }
 const colliders = []; const camBlockers = [];
 const trunkMat = toon(0x6b4423), leafA = toon(0x2f8f3a), leafB = toon(0x48a84f), birchMat = toon(0xf4f1e8), birchLeaf = toon(0x9ccc4a), birchSpot = toon(0x2a2a2a);
@@ -766,7 +792,7 @@ const kolobok = makeKolobok(); kolobok.position.set(KOLO_HOME.x + 8, 0, KOLO_HOM
 const kolo = { a: 0, cd: 0, sang: 0, vel: new THREE.Vector3() };
 
 // перья Жар-птицы (3 из 7 видно только Сказительским взглядом)
-const FEATHERS = [[-40, -10, 0], [38, -6, 1], [4, -42, 0], [-24, -26, 1], [18, 30, 0], [-43, 22, 1], [1, 21, 0]].map(([x, z, hidden], i) => {
+const FEATHERS = [[-43, -6, 0], [38, -6, 1], [4, -42, 0], [-24, -26, 1], [18, 30, 0], [-43, 22, 1], [1, 21, 0]].map(([x, z, hidden], i) => {
   const g = makeFeather(); g.position.set(x, H(x, z) + 1, z); scene.add(g); return { g, hidden: !!hidden, i };
 });
 
@@ -1345,7 +1371,7 @@ function spawnEnemy(parent, pos, o = {}) {
 }
 function removeEnemies(group) { for (let i = enemies.length - 1; i >= 0; i--) if (enemies[i].group === group) { enemies[i].g.parent?.remove(enemies[i].g); enemies.splice(i, 1); } }
 const ctx = {
-  THREE, scene, S, ui, toon, grad, MD, KITS, KIT_ANIMS, kit, pet, npc, M, P: (n, x, z, s, ry, dy, parent, hf) => place(MD, parent || scene, n, x, (hf || groundH)(x, z) + (dy || 0), z, s ?? 1, ry ?? srand() * 6.28),
+  THREE, scene, S, ui, toon, grad, MD, KITS, KIT_ANIMS, kit, pet, horse, npc, M, P: (n, x, z, s, ry, dy, parent, hf) => place(MD, parent || scene, n, x, (hf || groundH)(x, z) + (dy || 0), z, s ?? 1, ry ?? srand() * 6.28),
   burst, makeChar, wait, srand, smooth, mixers, chars, colliders, camBlockers, interactables, enemies, hittables, player, heroes, keys, camera,
   get st() { return st; }, save, addBook, addWord, travel, groundH, unlockHero, switchHero, hurtPlayer, hurtEnemy, toggleSight, shake, makeForgetling,
   T: () => T, life: () => life, lifeify, lifeifyTree, uLife, objective: () => objective(), makeTerrain, spawnEnemy, removeEnemies, lockPlayer: (v) => (player.locked = v),
