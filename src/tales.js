@@ -24,6 +24,7 @@ export function initTales(c) {
     const legs = []; for (const [x, z] of [[-0.45, 0.6], [0.45, 0.6], [-0.45, -0.6], [0.45, -0.6]]) { const p = new THREE.Group(); p.position.set(x, 0.85, z); o.add(p); M(new THREE.CylinderGeometry(0.22, 0.2, 0.85, 8), T3(0x6a3e1e), 0, -0.42, 0, p); legs.push(p); }
     o.userData.legs = legs; o.scale.setScalar(s); return o;
   }
+  c.makeBear = makeBear; // тот же медведь — в вечернем театре («Теремок», «Зимовье зверей»)
   function makeGoose(s = 1) {
     const o = new THREE.Group(), w = T3(0xf6f6f2), or = T3(0xff9a2a);
     blob(o, w, 0.42, 0, 0.6, 0, 1, 0.8, 1.4); const n = M(new THREE.CylinderGeometry(0.07, 0.1, 0.6, 8), w, 0, 1.0, 0.42, o); n.rotation.x = 0.25; blob(o, w, 0.15, 0, 1.33, 0.52);

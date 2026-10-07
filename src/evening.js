@@ -227,7 +227,7 @@ export function initEvening(c, X) {
     princess: () => { const ch = c.npc('vasilisa'); return ch.root; },
     bunny: () => c.pet('pets/bunny', 0.75).root, fox: () => c.pet('pets/fox', 0.85).root,
     wolf: () => tint(c.pet('pets/dog', 0.95).root, 0x9aa0aa), dog: () => c.pet('pets/dog', 0.85).root,
-    bear: () => tint(c.pet('pets/hog', 1.5).root, 0x8a5a33), bull: () => c.pet('pets/cow', 1.0).root,
+    bear: () => (c.makeBear ? c.makeBear(0.62) : tint(c.pet('pets/hog', 1.5).root, 0x8a5a33)), bull: () => c.pet('pets/cow', 1.0).root,
     girl: () => c.npc('alyonushka', { scale: 0.5 }).root, sister: () => c.npc('ivan_false', { scale: 0.5 }).root, morozko: () => c.npc('morozko', { scale: 0.6 }).root,
     sled: () => c.kit('holiday/sled', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0), chest: () => c.kit('survival/chest', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0),
     fir: () => { const g = new THREE.Group(); const t = c.kit('holiday/tree-snow-a', 0, 0, 2.2, 0, 0, g, () => 0); return g; },
