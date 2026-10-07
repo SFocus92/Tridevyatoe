@@ -190,15 +190,28 @@ export function initEvening(c, X) {
 
   // ---------- Жар-птица ----------
   const fb = new THREE.Group(); lukGroup.add(fb); fb.visible = false;
-  { const B = (col) => new THREE.MeshBasicMaterial({ color: col });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), B(0xff9a1e)); body.scale.set(0.8, 0.8, 1.5); fb.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), B(0xffd23a)); head.position.set(0, 0.35, 0.8); fb.add(head);
-    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 6), B(0xff4a1a)); crest.position.set(0, 0.75, 0.75); fb.add(crest);
-    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 5), B(0xfff0a0)); beak.rotation.x = Math.PI / 2; beak.position.set(0, 0.32, 1.15); fb.add(beak);
-    const wingShape = new THREE.Shape(); wingShape.moveTo(0, 0); wingShape.quadraticCurveTo(1.2, 0.5, 2.2, -0.2); wingShape.lineTo(1.4, -0.5); wingShape.lineTo(0, -0.5);
-    const wg = new THREE.ShapeGeometry(wingShape); const wm = new THREE.MeshBasicMaterial({ color: 0xff6a1a, side: THREE.DoubleSide });
-    fb.userData.wings = [1, -1].map((sd) => { const piv = new THREE.Group(); piv.position.set(0.3 * sd, 0.15, 0); const w = new THREE.Mesh(wg, wm); w.rotation.x = -Math.PI / 2; w.scale.x = sd; piv.add(w); fb.add(piv); return piv; });
-    [[0, 0xffc040], [0.35, 0xff5020], [-0.35, 0xff5020]].forEach(([a, col]) => { const t = new THREE.Mesh(new THREE.ConeGeometry(0.16, 2.4, 6), B(col)); t.rotation.x = -Math.PI / 2 - 0.25; t.rotation.z = a; t.position.set(a * 0.8, 0.1, -1.7); fb.add(t); });
+  { const B = (col) => new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide }); const add = (geo, mat, x, y, z, par = fb) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); par.add(m); return m; };
+    // v1.5.3: Жар-птица — павлинья стать: стройное тело, шея, хохолок-коронка, хвост-веер из перьев с «глазками»
+    add(new THREE.SphereGeometry(0.45, 14, 10), B(0xff9a1e), 0, 0, 0).scale.set(0.75, 0.85, 1.3);
+    add(new THREE.SphereGeometry(0.3, 12, 8), B(0xffc040), 0, 0.08, 0.32).scale.set(0.9, 1, 0.9);
+    const neck = add(new THREE.CylinderGeometry(0.11, 0.19, 0.62, 10), B(0xffb02a), 0, 0.42, 0.55); neck.rotation.x = 0.45;
+    const head = new THREE.Group(); head.position.set(0, 0.78, 0.74); fb.add(head);
+    add(new THREE.SphereGeometry(0.19, 12, 10), B(0xffd23a), 0, 0, 0, head).scale.set(0.9, 0.95, 1.15);
+    add(new THREE.ConeGeometry(0.06, 0.24, 6), B(0xfff0a0), 0, -0.03, 0.27, head).rotation.x = Math.PI / 2 + 0.25;
+    for (const sx of [-1, 1]) add(new THREE.SphereGeometry(0.035, 6, 5), B(0x2a0a00), sx * 0.13, 0.05, 0.1, head);
+    for (const a of [-0.35, 0, 0.35]) { const st = new THREE.Group(); st.rotation.set(-0.25, 0, a); head.add(st); st.position.y = 0.12; add(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 4), B(0xff4a1a), 0, 0.18, 0, st); add(new THREE.SphereGeometry(0.055, 8, 6), B(0xffd23a), 0, 0.38, 0, st); }
+    const wingShape = new THREE.Shape(); wingShape.moveTo(0, 0); wingShape.quadraticCurveTo(1.1, 0.45, 2.0, -0.15); wingShape.lineTo(1.75, -0.38); wingShape.lineTo(1.45, -0.32); wingShape.lineTo(1.2, -0.55); wingShape.lineTo(0.9, -0.45); wingShape.lineTo(0.6, -0.62); wingShape.lineTo(0, -0.45);
+    const inner = new THREE.Shape(); inner.moveTo(0, 0); inner.quadraticCurveTo(0.7, 0.3, 1.25, -0.05); inner.lineTo(0.8, -0.3); inner.lineTo(0, -0.3);
+    const wg = new THREE.ShapeGeometry(wingShape), wg2 = new THREE.ShapeGeometry(inner), wm = B(0xff6a1a), wm2 = B(0xffb02a);
+    fb.userData.wings = [1, -1].map((sd) => { const piv = new THREE.Group(); piv.position.set(0.28 * sd, 0.18, 0.05); const w = new THREE.Mesh(wg, wm); w.rotation.x = -Math.PI / 2; w.scale.x = sd; piv.add(w); const w2 = new THREE.Mesh(wg2, wm2); w2.rotation.x = -Math.PI / 2; w2.scale.x = sd; w2.position.y = 0.02; piv.add(w2); fb.add(piv); return piv; });
+    // хвост-веер: перо = стержень-лопасть + «глазок» на конце; rotation.x хвоста поднимает веер (на ветке — распущен)
+    const tail = new THREE.Group(); tail.position.set(0, 0.12, -0.5); fb.add(tail); fb.userData.tail = tail;
+    const vane = (L) => { const sh = new THREE.Shape(); sh.moveTo(-0.03, 0); sh.quadraticCurveTo(-0.2, L * 0.6, -0.15, L * 0.92); sh.quadraticCurveTo(0, L * 1.06, 0.15, L * 0.92); sh.quadraticCurveTo(0.2, L * 0.6, 0.03, 0); sh.closePath(); return new THREE.ShapeGeometry(sh); };
+    const eyeA = new THREE.CircleGeometry(0.13, 14), eyeB = new THREE.CircleGeometry(0.075, 12), eyeC = new THREE.CircleGeometry(0.035, 10), mA = B(0xffd23a), mB = B(0xd8241a), mC = B(0x6a0a10);
+    const N = 9; for (let i = 0; i < N; i++) { const k = i / (N - 1) - 0.5, L = 2.5 - Math.abs(k) * 1.1, f = new THREE.Group(); f.rotation.y = Math.PI + k * 2.6; tail.add(f);
+      const pl = new THREE.Group(); pl.rotation.x = Math.PI / 2; f.add(pl); // плоскость пера — горизонтально, вдоль +z группы f
+      const v = new THREE.Mesh(vane(L), B(i % 2 ? 0xff5020 : 0xff8a2a)); pl.add(v);
+      for (const [g2, m2, dz] of [[eyeA, mA, 0.01], [eyeB, mB, 0.02], [eyeC, mC, 0.03]]) { const e = new THREE.Mesh(g2, m2); e.position.set(0, L * 0.84, -dz); pl.add(e); } }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0xffa040, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); glow.scale.setScalar(5); fb.add(glow); fb.userData.glow = glow; }
   const PERCH = X.FIREBIRD_SEAT ? X.FIREBIRD_SEAT.clone().add(new THREE.Vector3(0, 0.45, 0)) : new THREE.Vector3(-4.5, H(-4.5, 6.5) + 2.4, 6.5); // ветка дуба напротив русалки
   let perched = false;
@@ -227,7 +240,7 @@ export function initEvening(c, X) {
     princess: () => { const ch = c.npc('vasilisa'); return ch.root; },
     bunny: () => c.pet('pets/bunny', 0.75).root, fox: () => c.pet('pets/fox', 0.85).root,
     wolf: () => tint(c.pet('pets/dog', 0.95).root, 0x9aa0aa), dog: () => c.pet('pets/dog', 0.85).root,
-    bear: () => (c.makeBear ? c.makeBear(0.62) : tint(c.pet('pets/hog', 1.5).root, 0x8a5a33)), bull: () => c.pet('pets/cow', 1.0).root,
+    bear: () => (c.makeBear ? c.makeBear(0.85) : tint(c.pet('pets/hog', 1.5).root, 0x8a5a33)), bull: () => c.pet('pets/cow', 1.0).root,
     girl: () => c.npc('alyonushka', { scale: 0.5 }).root, sister: () => c.npc('ivan_false', { scale: 0.5 }).root, morozko: () => c.npc('morozko', { scale: 0.6 }).root,
     sled: () => c.kit('holiday/sled', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0), chest: () => c.kit('survival/chest', 0, 0, 1.4, 0, 0, new THREE.Group(), () => 0),
     fir: () => { const g = new THREE.Group(); const t = c.kit('holiday/tree-snow-a', 0, 0, 2.2, 0, 0, g, () => 0); return g; },
@@ -438,7 +451,7 @@ export function initEvening(c, X) {
       const tgt = want ? PERCH : orbit; const prev = fb.position.clone(); fb.position.lerp(tgt, Math.min(1, dt * (want ? 1.5 : 2.5)));
       const v = fb.position.clone().sub(prev); if (v.lengthSq() > 1e-6 && !want) fb.rotation.y = Math.atan2(v.x, v.z); else if (want) fb.rotation.y = Math.atan2(player.pos.x - fb.position.x, player.pos.z - fb.position.z);
       perched = want && fb.position.distanceTo(PERCH) < 0.6;
-      const fl = Math.sin(t * (perched ? 2 : 7)) * (perched ? 0.25 : 0.7); fb.userData.wings[0].rotation.z = fl; fb.userData.wings[1].rotation.z = -fl;
+      const fl = Math.sin(t * (perched ? 2 : 7)) * (perched ? 0.25 : 0.7); fb.userData.wings[0].rotation.z = fl; fb.userData.wings[1].rotation.z = -fl; { const tl = fb.userData.tail; tl.rotation.x += ((perched ? 1.3 : 0.12) - tl.rotation.x) * Math.min(1, dt * 2); tl.scale.x += ((perched ? 1 : 0.45) - tl.scale.x) * Math.min(1, dt * 2); tl.rotation.z = Math.sin(t * 1.3) * 0.05; }
       fb.userData.glow.material.opacity = 0.75 * night; if (Math.random() < dt * 12) c.burst(fb.position.clone(), Math.random() < 0.5 ? 0xffc040 : 0xff6a20, 1, 0.6, 0.9, 0.12);
     }
     updateStage(dt);
