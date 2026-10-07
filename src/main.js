@@ -8,6 +8,8 @@ import { uLife, lifeify, lifeifyTree } from './life.js';
 import { initEvening, RETELL } from './evening.js';
 import { initExtra } from './extra.js';
 import { initTales } from './tales.js';
+// v1.5.5: iPhone/iPad (Safari) не знает Pointer Lock — без заглушки вызов exitPointerLock() ронял «Действие» (✋) и разговоры
+if (typeof document.exitPointerLock !== 'function') { try { Object.defineProperty(document, 'exitPointerLock', { value: () => {}, configurable: true, writable: true }); } catch (e) {} }
 window.__RET = RETELL;
 
 const S = new Sound();
@@ -1445,6 +1447,12 @@ async function startGame(cont) {
   document.getElementById('hud').classList.remove('hidden');
   if (!cont) setTimeout(() => ui.toast('Ты просыпаешься на берегу Лукоморья. Всё вокруг серое…', false, 4000), 600);
 }
+// v1.5.5: iOS — звук включается только по касанию/клику (touchend/click), WebAudio может «уснуть» (звонок, сворачивание);
+// audioSession 'playback' (iOS 17+) — чтобы звук не глушился переключателем «Без звука»
+{ const wake = () => { try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+    try { if (S.ctx && S.ctx.state !== 'running') S.ctx.resume(); } catch (e) {} };
+  for (const ev of ['touchend', 'click', 'keydown']) addEventListener(ev, wake, { passive: true, capture: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); }); }
 document.getElementById('btnNew').onclick = () => startGame(false);
 if (localStorage.getItem(SAVE_KEY)) { const b = document.getElementById('btnCont'); b.classList.remove('hidden'); b.onclick = () => startGame(true); }
 // фон титульного экрана: медленный облёт

@@ -2,7 +2,7 @@
 // assets/ и vendor/ (музыка, модели, Three.js) — сначала из кэша; код и страницы — сначала из сети (обновления приходят сразу).
 // v1.5: озвучка (assets/voice) — в отдельном кэше VOICE, он не стирается при смене версии: имена файлов содержат ключ текста,
 // поэтому изменённая реплика просто получает новый файл. По сообщению {type:'offline'} кэш докачивает всю игру и всю озвучку.
-const CACHE = 'tridevyatoe-v1.5.4'; // поменяйте версию, если перерендерили музыку или заменили модели
+const CACHE = 'tridevyatoe-v1.5.5'; // поменяйте версию, если перерендерили музыку или заменили модели
 const VOICE = 'tridevyatoe-voice-v1';
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', 'index.html', 'style.css', 'vendor/three.module.js']).catch(() => {}))); });
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('tridevyatoe-') && k !== CACHE && k !== VOICE).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

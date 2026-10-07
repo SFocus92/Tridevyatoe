@@ -24,6 +24,7 @@
 - **v1.5.2** — медведь вечернего театра = `makeBear()` из tales.js (`c.makeBear`), вместо тонированного hog.
 - **v1.5.3** — Жар-птица (evening.js): павлинья модель, хвост-веер `fb.userData.tail` (на ветке распущен, в полёте шлейф); медведь театра `makeBear(0.85)`.
 - **v1.5.4** — камера: `rotCam/zoomCam`, перетаскивание в диалогах, PITCH_MIN −0.45 (взгляд вверх), потолок `OAK.y + 13`, облёт `camOverride` (ovYaw/ovPitch/ovZoom); сцена сказки на ночь — `camFor/camLook`; `runeStone()` (ctx.runeStone) — надпись-текстура и ромб «не прочитано» (распутье, Калинов мост); фикс voice.js report.
+- **v1.5.5** — iOS: заглушка `document.exitPointerLock` (её отсутствие роняло interact), пробуждение AudioContext и разблокировка голоса по touchend/click, `navigator.audioSession.type = 'playback'`; тест `tools/test/ios.js`.
 
 ## Идеи на будущее
 - Рисованные портреты в диалогах; при желании — живые актёры или голос с эмоциями (Yandex SpeechKit) поверх того же конвейера `tools/voice`.

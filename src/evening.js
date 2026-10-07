@@ -313,7 +313,7 @@ export function initEvening(c, X) {
   addEventListener('pointerdown', warm, { once: false, passive: true }); addEventListener('keydown', warm, { passive: true });
   // v1.5: записанные голоса (assets/voice) — главные; speechSynthesis — запасной вариант
   const REC = createVoice();
-  addEventListener('pointerdown', () => REC.unlock(), { passive: true }); addEventListener('keydown', () => REC.unlock(), { passive: true });
+  for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) addEventListener(ev, () => REC.unlock(), { passive: true, capture: true }); // iOS: разблокировка звука — только по touchend/click
   const hush = () => { cur = null; REC.stop(); clearInterval(keep); keep = null; if (synth && (synth.speaking || synth.pending)) synth.cancel(); };
   ui.cleanLen = (text) => clean(text).length || 1;
   ui.voiceRate = () => OPT.voiceRate || 1;
